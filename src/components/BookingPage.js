@@ -17,7 +17,8 @@ function duration(from, to) {
   return m < 60 ? `${m}m` : `${Math.floor(m/60)}h ${m%60}m`;
 }
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 }
 
 // ── Stop Dropdown (like Home page) ───────────────────────────────
@@ -112,7 +113,7 @@ function SearchSection({ onResults }) {
   // Today / Tomorrow quick buttons
   const setDay = (offset) => {
     const d = new Date(); d.setDate(d.getDate() + offset);
-    setForm(f => ({ ...f, date: d.toISOString().split('T')[0] }));
+    setForm(f => ({ ...f, date: new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0] }));
   };
 
   return (

@@ -197,7 +197,11 @@ export default function AdminPanel() {
   const [allStopsForBs, setAllStopsForBs] = useState([]);
   const [tripsForBus, setTripsForBus] = useState([]); // trips for selected bus
   // ✅ Trip date filter for bus-state tab — default: today
-  const [tripDateFilter, setTripDateFilter] = useState(new Date().toISOString().slice(0, 10));
+  const toLocalISODate = (dt) => {
+    const d = dt ? new Date(dt) : new Date();
+    return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().substring(0, 10);
+  };
+  const [tripDateFilter, setTripDateFilter] = useState(toLocalISODate());
 
   const [activeTab, setActiveTab] = useState("routes");
 
@@ -351,7 +355,7 @@ export default function AdminPanel() {
   };
 
   // Today's date string for highlighting
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = toLocalISODate();
 
   // ── styles ──
   const inp = { padding: "8px 12px", fontSize: 14, borderRadius: 7, border: "1px solid #cbd5e1", outline: "none", background: "#fff" };
@@ -662,8 +666,7 @@ export default function AdminPanel() {
                   {(() => {
                     const filtered = tripsForBus.filter(t => {
                       if (!tripDateFilter) return true;
-                      const d = new Date(t.departureTime);
-                      return d.toISOString().slice(0, 10) === tripDateFilter;
+                      return toLocalISODate(t.departureTime) === tripDateFilter;
                     });
                     return (
                       <select style={{ ...inp, width: "100%" }} value={bsForm.tripId}
@@ -674,8 +677,7 @@ export default function AdminPanel() {
                             : `Select Trip (${filtered.length} available)`}
                         </option>
                         {filtered.map(t => {
-                          const d = new Date(t.departureTime);
-                          const dateStr = d.toISOString().slice(0, 10);
+                          const dateStr = toLocalISODate(t.departureTime);
                           const isTodayTrip = dateStr === todayStr;
                           return (
                             <option key={t.tripId} value={t.tripId}>
