@@ -190,7 +190,9 @@ export default function AdminPanel() {
   const [driverForm, setDriverForm]   = useState({ name: "", phone: "" });
 
   const [trips, setTrips]     = useState([]);
+  const [tripType, setTripType] = useState("single"); // NEW: "single" | "bulk"
   const [tripForm, setTripForm] = useState({ busId: "", departureTime: "" });
+  const [bulkTripForm, setBulkTripForm] = useState({ busId: "", startDate: "", endDate: "", time: "" });
 
   const [busStates, setBusStates] = useState([]);
   const [bsForm, setBsForm] = useState({ busId: "", tripId: "", lat: "", lng: "", speedKmph: "", headingDeg: "" });
@@ -314,6 +316,25 @@ export default function AdminPanel() {
     if (data.error) { alert("Error: " + data.error); return; }
     alert(`Trip created! ID: ${data.tripId} | ${data.stopTimesCreated} stop times generated.`);
     setTripForm({ busId: "", departureTime: "" }); loadTrips(selectedRoute);
+  };
+
+  const addBulkTrips = async () => {
+    if (!selectedRoute || !bulkTripForm.busId || !bulkTripForm.startDate || !bulkTripForm.endDate || !bulkTripForm.time) { 
+      alert("Please fill all fields for bulk add."); return; 
+    }
+    const res = await fetch(`/api/admin/routes/${selectedRoute}/trips/bulk`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        busId: Number(bulkTripForm.busId),
+        startDate: bulkTripForm.startDate,
+        endDate: bulkTripForm.endDate,
+        departureTime: bulkTripForm.time
+      }),
+    });
+    const data = await res.json();
+    if (data.error) { alert("Error: " + data.error); return; }
+    alert(`Success: ${data.message} | ${data.stopTimesCreated} stop times generated total.`);
+    setBulkTripForm({ busId: "", startDate: "", endDate: "", time: "" }); loadTrips(selectedRoute);
   };
   const deleteTrip = async id => { await fetch(`/api/admin/trips/${id}`, { method: "DELETE" }); loadTrips(selectedRoute); };
 
@@ -536,15 +557,55 @@ export default function AdminPanel() {
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#0369a1" }}>
                 ℹ️ Creating a trip <strong>automatically generates stop_times</strong> — populating arrival and departure times for each stop on the route. View them using the <strong>👁 View Times</strong> button.
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                <select style={{ ...inp, width: 200 }} value={tripForm.busId} onChange={e => setTripForm({ ...tripForm, busId: e.target.value })}>
-                  <option value="">Select Bus</option>
-                  {buses.map(b => <option key={b.id} value={b.id}>{b.code} ({b.plate})</option>)}
-                </select>
-                <input style={{ ...inp, width: 220 }} type="datetime-local" value={tripForm.departureTime}
-                  onChange={e => setTripForm({ ...tripForm, departureTime: e.target.value })} />
-                <button style={btn()} onClick={addTrip}>+ Create Trip</button>
+              <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                <button
+                  style={btn(tripType === "single" ? "primary" : "secondary")}
+                  onClick={() => setTripType("single")}
+                >
+                  Single Trip
+                </button>
+                <button
+                  style={btn(tripType === "bulk" ? "primary" : "secondary")}
+                  onClick={() => setTripType("bulk")}
+                >
+                  Bulk Add Trips
+                </button>
               </div>
+
+              {tripType === "single" ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                  <select style={{ ...inp, width: 200 }} value={tripForm.busId} onChange={e => setTripForm({ ...tripForm, busId: e.target.value })}>
+                    <option value="">Select Bus</option>
+                    {buses.map(b => <option key={b.id} value={b.id}>{b.code} ({b.plate})</option>)}
+                  </select>
+                  <input style={{ ...inp, width: 220 }} type="datetime-local" value={tripForm.departureTime}
+                    onChange={e => setTripForm({ ...tripForm, departureTime: e.target.value })} />
+                  <button style={btn()} onClick={addTrip}>+ Create Trip</button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, background: "#f8fafc", padding: "10px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                  <select style={{ ...inp, width: 180 }} value={bulkTripForm.busId} onChange={e => setBulkTripForm({ ...bulkTripForm, busId: e.target.value })}>
+                    <option value="">Select Bus</option>
+                    {buses.map(b => <option key={b.id} value={b.id}>{b.code} ({b.plate})</option>)}
+                  </select>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500 }}>
+                    Start Date:
+                    <input style={{ ...inp, width: 140 }} type="date" value={bulkTripForm.startDate}
+                      onChange={e => setBulkTripForm({ ...bulkTripForm, startDate: e.target.value })} />
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500 }}>
+                    End Date:
+                    <input style={{ ...inp, width: 140 }} type="date" value={bulkTripForm.endDate}
+                      onChange={e => setBulkTripForm({ ...bulkTripForm, endDate: e.target.value })} />
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500 }}>
+                    Time:
+                    <input style={{ ...inp, width: 110 }} type="time" value={bulkTripForm.time}
+                      onChange={e => setBulkTripForm({ ...bulkTripForm, time: e.target.value })} />
+                  </label>
+                  <button style={btn()} onClick={addBulkTrips}>+ Create Bulk Trips</button>
+                </div>
+              )}
               <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                 {trips.map(t => (
                   <li key={t.tripId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
