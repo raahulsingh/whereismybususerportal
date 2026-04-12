@@ -106,7 +106,7 @@ function SearchSection({ onResults }) {
       const data = await res.json();
       if (data.error) { setError(data.error); return; }
       onResults(data, form);
-    } catch { setError('Search failed. Backend check karo.'); }
+    } catch { setError('Search failed. Check backend endpoint.'); }
     finally { setLoading(false); }
   };
 
@@ -265,7 +265,7 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment }) {
 
   // When moving to passenger step, init passenger forms
   const goToPassenger = () => {
-    if (selected.length === 0) { setError('Kam se kam ek seat select karo'); return; }
+    if (selected.length === 0) { setError('Select at least one seat'); return; }
     setError('');
     setPassengers(selected.map((seatNo, i) => ({
       seatNo, name: '', age: '', gender: 'Male', phone: '', email: ''
@@ -375,7 +375,7 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment }) {
             border: '1.5px solid ' + (selected.length > 0 ? '#bfdbfe' : '#e2e8f0') }}>
             <div>
               {selected.length === 0
-                ? <span style={{ color: '#94a3b8', fontSize: 14 }}>Seat(s) select karo</span>
+                ? <span style={{ color: '#94a3b8', fontSize: 14 }}>Select seat(s)</span>
                 : <>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>
                       {selected.length} seat{selected.length > 1 ? 's' : ''} selected: {selected.join(', ')}

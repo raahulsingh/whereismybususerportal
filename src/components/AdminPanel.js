@@ -117,7 +117,7 @@ function StopTimesModal({ tripId, tripInfo, onClose }) {
           <div style={{ textAlign: "center", padding: 32, color: "#94a3b8" }}>Loading stop times…</div>
         ) : stopTimes.length === 0 ? (
           <div style={{ color: "#ef4444", fontSize: 14, padding: "12px 0" }}>
-            ⚠️ Koi stop times nahi mili. Backend endpoint check karo.
+            ⚠️ No stop times found. Please check backend.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -305,7 +305,7 @@ export default function AdminPanel() {
 
   // ── Trips ──
   const addTrip = async () => {
-    if (!selectedRoute || !tripForm.busId || !tripForm.departureTime) { alert("Bus aur departure time dono select karo."); return; }
+    if (!selectedRoute || !tripForm.busId || !tripForm.departureTime) { alert("Please select both bus and departure time."); return; }
     const res = await fetch(`/api/admin/routes/${selectedRoute}/trips`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ busId: Number(tripForm.busId), departureTime: tripForm.departureTime }),
@@ -320,7 +320,7 @@ export default function AdminPanel() {
   // ── Bus State ──
   const saveBusState = async () => {
     if (!bsForm.busId || !bsForm.lat || !bsForm.lng) { alert("Bus ID, lat aur lng required hai."); return; }
-    if (!bsForm.tripId) { alert("Trip select karo — bus state trip-specific hona chahiye."); return; }
+    if (!bsForm.tripId) { alert("Please select a trip — bus state must be trip-specific."); return; }
     const res = await fetch("/api/admin/bus-state", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -434,7 +434,7 @@ export default function AdminPanel() {
 
               {/* ✅ UPDATED: Added Offset (min) field with tooltip */}
               <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 8, padding: "8px 14px", marginBottom: 10, fontSize: 13, color: "#854d0e" }}>
-                💡 <strong>Offset (min)</strong> = departure time se kitne minute baad bus yahan pahunche. Pehle stop = 0, doosra = 10 (matlab 10 min baad), etc.
+                💡 <strong>Offset (min)</strong> = Minutes after departure when bus arrives here. First stop = 0, second = 10 means it arrives 10 mins later.
               </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
@@ -452,7 +452,7 @@ export default function AdminPanel() {
                   placeholder="⏱ Offset (min)"
                   type="number"
                   min="0"
-                  title="Departure time se kitne minute baad bus is stop par pahunche"
+                  title="Minutes after departure time when the bus reaches this stop"
                   value={stopForm.offsetMin}
                   onChange={e => setStopForm({ ...stopForm, offsetMin: e.target.value })}
                 />
@@ -461,7 +461,7 @@ export default function AdminPanel() {
                   style={{ ...inp, width: 120, borderColor: "#86efac", background: "#f0fdf4" }}
                   placeholder="💰 Price +/- (₹)"
                   type="number"
-                  title="Is stop tak pahunchne ka extra price. Ara=0, Aurangabad=+50 matlab Ara se Aurangabad ₹50 extra"
+                  title="Additional cost to reach this stop. e.g. Ara=0, Aurangabad=+50 means ₹50 extra added to base fare."
                   value={stopForm.priceOffset}
                   onChange={e => setStopForm({ ...stopForm, priceOffset: e.target.value })}
                 />
@@ -534,7 +534,7 @@ export default function AdminPanel() {
               {/* ── Trips ── */}
               <SectionHeader>🗓 Trips — {selectedRouteName}</SectionHeader>
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#0369a1" }}>
-                ℹ️ Trip banane par <strong>stop_times automatic generate</strong> ho jaate hain — route ke har stop ke liye arrival aur departure time bhar jaata hai. <strong>👁 View Times</strong> button se dekho.
+                ℹ️ Creating a trip <strong>automatically generates stop_times</strong> — populating arrival and departure times for each stop on the route. View them using the <strong>👁 View Times</strong> button.
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
                 <select style={{ ...inp, width: 200 }} value={tripForm.busId} onChange={e => setTripForm({ ...tripForm, busId: e.target.value })}>
@@ -594,7 +594,7 @@ export default function AdminPanel() {
                 <button style={btn("danger")} onClick={() => deleteDriver(d.id)}>Delete</button>
               </li>
             ))}
-            {drivers.length === 0 && <li style={{ color: "#94a3b8", fontSize: 14 }}>Koi driver nahi mila.</li>}
+            {drivers.length === 0 && <li style={{ color: "#94a3b8", fontSize: 14 }}>No drivers found.</li>}
           </ul>
         </>
       )}
@@ -619,7 +619,7 @@ export default function AdminPanel() {
                   }}>
                   <option value="">Select Bus</option>
                   {routes.flatMap(() => buses).length === 0
-                    ? <option disabled>Routes tab se route select karo pehle</option>
+                    ? <option disabled>Select a route from Routes tab first</option>
                     : buses.map(b => <option key={b.id} value={b.id}>{b.code}</option>)
                   }
                 </select>
@@ -629,7 +629,7 @@ export default function AdminPanel() {
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 4 }}>
                   TRIP DATE FILTER
-                  <span style={{ fontWeight: 400, marginLeft: 6, color: "#94a3b8" }}>(trips filter honge)</span>
+                  <span style={{ fontWeight: 400, marginLeft: 6, color: "#94a3b8" }}>(filters trips)</span>
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <input
@@ -661,7 +661,7 @@ export default function AdminPanel() {
                 <div style={{ flex: 1, minWidth: 260 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 4 }}>
                     TRIP <span style={{ color: "#ef4444" }}>*</span>
-                    <span style={{ fontWeight: 400, marginLeft: 6 }}>(bus state sirf is trip ke liye save hoga)</span>
+                    <span style={{ fontWeight: 400, marginLeft: 6 }}>(bus state will only be saved for this trip)</span>
                   </div>
                   {(() => {
                     const filtered = tripsForBus.filter(t => {
@@ -673,7 +673,7 @@ export default function AdminPanel() {
                         onChange={e => setBsForm({ ...bsForm, tripId: e.target.value })}>
                         <option value="">
                           {filtered.length === 0
-                            ? `Koi trip nahi mili ${tripDateFilter} ko`
+                            ? `No trips found on ${tripDateFilter}`
                             : `Select Trip (${filtered.length} available)`}
                         </option>
                         {filtered.map(t => {
@@ -744,8 +744,8 @@ export default function AdminPanel() {
 
             {/* Hint */}
             <div style={{ fontSize: 12, color: "#64748b", marginTop: 10 }}>
-              💡 Pehle <strong>Routes</strong> tab mein route select karo → Bus aur Stop dropdown fill honge.
-              Trip select karo → bus state <strong>sirf us trip ke liye</strong> save hoga, baaki trips unaffected rahenge.
+              💡 First select a route from the <strong>Routes</strong> tab → This populates the Bus and Stop dropdowns.<br/>
+              Select a Trip → the bus state will be saved <strong>only for that trip</strong>, leaving other trips unaffected.
             </div>
           </div>
 
