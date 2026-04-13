@@ -3,9 +3,7 @@ import './App.css';
 import BusResults from './components/BusResults';
 import SearchForm from './components/SearchForm';
 import TripDetails from './components/TripDetails';
-import AdminPanel from './components/AdminPanel';
 import BookingPage from './components/BookingPage';
-import BookingAdmin from './components/BookingAdmin';
 
 function calculateDuration(start, end) {
   if (!start || !end) return null;
@@ -37,7 +35,7 @@ function App() {
   const [selectedTravelDate, setSelectedTravelDate]   = useState(null);
   const [loadingTripDetails, setLoadingTripDetails]   = useState(false);
   const [hasSearched, setHasSearched]                 = useState(false);
-  const [adminMode, setAdminMode]                     = useState(null); // null | 'tracking' | 'booking'
+
 
   useEffect(() => {
     fetch('/api/stops')
@@ -94,11 +92,10 @@ function App() {
               { key: 'home', label: 'Home' },
               { key: 'book', label: 'Book Ticket' },
               { key: 'support', label: 'Supports' },
-              { key: 'admin', label: 'Admin' },
             ].map(({ key, label }) => (
               <button key={key}
                 className={`nav-link${activePage === key ? ' nav-link--active' : ''}`}
-                onClick={() => { setActivePage(key); if (key === 'admin') setAdminMode(null); }}>
+                onClick={() => setActivePage(key)}>
                 {label}
               </button>
             ))}
@@ -108,47 +105,6 @@ function App() {
 
       <main className="app-main">
 
-        {/* ── ADMIN ── */}
-        {activePage === 'admin' && !adminMode && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 360, gap: 20 }}>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>🛠 Admin Panel</div>
-            <div style={{ color: '#64748b' }}>Kaunsa admin panel kholna hai?</div>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button onClick={() => setAdminMode('tracking')} style={{
-                padding: '20px 40px', background: '#2563eb', color: '#fff', border: 'none',
-                borderRadius: 14, fontSize: 16, fontWeight: 700, cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(37,99,235,0.3)', textAlign: 'center', lineHeight: 1.8,
-              }}>
-                📡 Tracking Admin<br />
-                <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.85 }}>Routes · Buses · Trips · Bus State</span>
-              </button>
-              <button onClick={() => setAdminMode('booking')} style={{
-                padding: '20px 40px', background: '#16a34a', color: '#fff', border: 'none',
-                borderRadius: 14, fontSize: 16, fontWeight: 700, cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(22,163,74,0.3)', textAlign: 'center', lineHeight: 1.8,
-              }}>
-                🎫 Booking Admin<br />
-                <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.85 }}>Bookings · Pricing · Password</span>
-              </button>
-            </div>
-          </div>
-        )}
-        {activePage === 'admin' && adminMode === 'tracking' && (
-          <>
-            <div style={{ maxWidth: 860, margin: '0 auto', padding: '0.5rem 1.5rem' }}>
-              <button onClick={() => setAdminMode(null)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>← Admin Home</button>
-            </div>
-            <AdminPanel />
-          </>
-        )}
-        {activePage === 'admin' && adminMode === 'booking' && (
-          <>
-            <div style={{ maxWidth: 900, margin: '0 auto', padding: '0.5rem 1.5rem' }}>
-              <button onClick={() => setAdminMode(null)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>← Admin Home</button>
-            </div>
-            <BookingAdmin />
-          </>
-        )}
 
         {/* ── HOME ── */}
         {activePage === 'home' && (
