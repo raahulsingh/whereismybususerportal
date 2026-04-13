@@ -249,7 +249,7 @@ export default function AdminPanel() {
   const addStop = async () => {
     if (!selectedRoute) return;
     if (!stopForm.offsetMin && stopForm.offsetMin !== 0) {
-      alert("Offset minutes daalna zaroori hai — trip create hone par arrival/departure time isi se calculate hoga.");
+      alert("Offset minutes is required — arrival/departure times are calculated from this value when a trip is created.");
       return;
     }
     await fetch(`/api/admin/routes/${selectedRoute}/stops`, {

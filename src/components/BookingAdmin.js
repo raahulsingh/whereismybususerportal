@@ -203,7 +203,7 @@ export default function BookingAdmin() {
             {loadingB ? (
               <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Loading…</div>
             ) : bookings.length === 0 ? (
-              <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>Koi booking nahi mili.</div>
+              <div style={{ padding: 40, color: '#94a3b8', textAlign: 'center' }}>No bookings found.</div>
             ) : (
               <div style={{ width: '100%', overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
@@ -300,7 +300,7 @@ export default function BookingAdmin() {
         {tab === 'pricing' && (
           <div style={{ background: '#fff', borderRadius: 14, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', padding: 28 }}>
             <div style={{ fontSize: 14, color: '#64748b', marginBottom: 20 }}>
-              Har route ke liye base price set karo. Yahi price seat booking pe dikhegi.
+              Set the base price for each route. This price will be displayed during seat booking.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {pricing.map(p => (
@@ -326,7 +326,7 @@ export default function BookingAdmin() {
               ))}
               {pricing.length === 0 && (
                 <div style={{ color: '#94a3b8', padding: 20, textAlign: 'center' }}>
-                  Koi route nahi mila. Pehle route add karo.
+                  No routes found. Please add a route first.
                 </div>
               )}
             </div>
@@ -344,7 +344,7 @@ export default function BookingAdmin() {
               Change Password
             </div>
             <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>
-              Booking admin ka password change karo.
+              Change the booking admin password.
             </div>
             {[
               ['Current Password', 'current'],

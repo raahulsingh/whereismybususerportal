@@ -95,7 +95,7 @@ function SearchSection({ onResults }) {
   }, []);
 
   const search = async () => {
-    if (!form.from || !form.to || !form.date) { setError('Sabhi fields bharein'); return; }
+    if (!form.from || !form.to || !form.date) { setError('Please fill in all fields.'); return; }
     setLoading(true); setError('');
     try {
       const res = await fetch('/api/booking/search', {
@@ -159,12 +159,12 @@ function SearchSection({ onResults }) {
 // ── Step 2: Bus Results ──────────────────────────────────────────
 function BusList({ results, searchInfo, onSelect }) {
   if (!results || results.length === 0)
-    return <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 16 }}>😔 Koi bus nahi mili is route par.</div>;
+    return <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 16 }}>😔 No buses found on this route.</div>;
 
   return (
     <div style={{ maxWidth: 700, margin: '24px auto' }}>
       <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12 }}>
-        <strong>{results.length} buses</strong> mili — {searchInfo.from} → {searchInfo.to} · {fmtDate(searchInfo.date)}
+        <strong>{results.length} buses</strong> found — {searchInfo.from} → {searchInfo.to} · {fmtDate(searchInfo.date)}
       </div>
       {results.map((bus, i) => (
         <div key={i} onClick={() => onSelect(bus)} style={{
@@ -281,7 +281,7 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment }) {
     // Validate
     for (let i = 0; i < passengers.length; i++) {
       if (!passengers[i].name.trim() || !passengers[i].phone.trim()) {
-        setError(`Passenger ${i+1} (Seat ${passengers[i].seatNo}): Naam aur phone zaroori hai`);
+        setError(`Passenger ${i+1} (Seat ${passengers[i].seatNo}): Name and phone number are required.`);
         return;
       }
     }
