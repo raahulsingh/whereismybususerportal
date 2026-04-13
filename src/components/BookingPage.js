@@ -215,7 +215,7 @@ function BusList({ results, searchInfo, onSelect }) {
 }
 
 // ── Step 3: Seat Layout ──────────────────────────────────────────
-function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment }) {
+function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
   const [layout, setLayout]     = useState(null);
   const [booked, setBooked]     = useState([]);
   const [selected, setSelected] = useState([]); // ✅ Array for multiple seats
@@ -267,9 +267,14 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment }) {
   const goToPassenger = () => {
     if (selected.length === 0) { setError('Select at least one seat'); return; }
     setError('');
-    setPassengers(selected.map((seatNo, i) => ({
-      seatNo, name: '', age: '', gender: 'Male', phone: '', email: ''
-    })));
+    
+    // Auto-fill first passenger from logged in user
+    setPassengers(selected.map((seatNo, i) => {
+      if (i === 0 && user) {
+        return { seatNo, name: user.name || '', age: user.age || '', gender: 'Male', phone: user.phone || '', email: user.email || '' };
+      }
+      return { seatNo, name: '', age: '', gender: 'Male', phone: '', email: '' };
+    }));
     setStep('passenger');
   };
 
@@ -1007,7 +1012,7 @@ function BookingConfirmed({ bookingData, trip, seats, passengers, onDone, onBook
 }
 
 // ── Main BookingPage ─────────────────────────────────────────────
-export default function BookingPage() {
+export default function BookingPage({ user, onRequestLogin }) {
   const [stage, setStage]         = useState('search');  // search | results | seats | payment | confirmed
   const [results, setResults]     = useState([]);
   const [searchInfo, setSearchInfo] = useState({});
@@ -1018,6 +1023,19 @@ export default function BookingPage() {
   const [paymentSeats, setPaymentSeats]         = useState([]);
   const [paymentPassengers, setPaymentPassengers] = useState([]);
   const [bookingError, setBookingError]         = useState('');
+
+  if (!user && (stage === 'search' || stage === 'results' || stage === 'seats')) {
+      return (
+        <div style={{ padding: '80px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 60, marginBottom: 20 }}>🔐</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#1e293b', marginBottom: 12 }}>Authentication Required</div>
+            <div style={{ color: '#64748b', marginBottom: 24 }}>You must be logged in to search and book tickets.</div>
+            <button onClick={onRequestLogin} style={{ padding: '14px 28px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 10, fontSize: 16, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(37,99,235,0.2)' }}>
+                Login / Register
+            </button>
+        </div>
+      );
+  }
 
   const handleResults = (data, info) => {
     setResults(data); setSearchInfo(info); setStage('results');
@@ -1055,6 +1073,7 @@ export default function BookingPage() {
             toStop: searchInfo.to,
             amount: selectedTrip.price,
             travelDate: searchInfo.date || '',
+            userId: user ? user.id : null
           }),
         });
         const data = await res.json();
@@ -1123,6 +1142,7 @@ export default function BookingPage() {
         <SeatLayout
           trip={selectedTrip}
           searchInfo={searchInfo}
+          user={user}
           onSeatBooked={handleBooked}
           onGoToPayment={handleGoToPayment}
         />

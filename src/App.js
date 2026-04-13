@@ -4,6 +4,8 @@ import BusResults from './components/BusResults';
 import SearchForm from './components/SearchForm';
 import TripDetails from './components/TripDetails';
 import BookingPage from './components/BookingPage';
+import AuthForm from './components/AuthForm';
+import UserDashboard from './components/UserDashboard';
 
 function calculateDuration(start, end) {
   if (!start || !end) return null;
@@ -35,6 +37,8 @@ function App() {
   const [selectedTravelDate, setSelectedTravelDate]   = useState(null);
   const [loadingTripDetails, setLoadingTripDetails]   = useState(false);
   const [hasSearched, setHasSearched]                 = useState(false);
+  const [user, setUser]                               = useState(null);
+  const [showAuth, setShowAuth]                       = useState(false);
 
 
   useEffect(() => {
@@ -43,6 +47,14 @@ function App() {
       .then(d => { const raw = Array.isArray(d) ? d : []; setAllStops(deduplicateStopsByName(raw)); })
       .catch(() => setError('Backend error'))
       .finally(() => setLoadingStops(false));
+      
+    const token = localStorage.getItem('bus_token');
+    if (token) {
+      fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d && !d.error) setUser(d); })
+        .catch(() => {});
+    }
   }, []);
 
   const handleSearch = async ({ sourceId, destinationId, date }) => {
@@ -79,6 +91,13 @@ function App() {
     finally { setLoadingTripDetails(false); }
   };
 
+  const handleLogout = () => {
+    fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('bus_token')}` } });
+    localStorage.removeItem('bus_token');
+    setUser(null);
+    if(activePage === 'my-bookings' || activePage === 'book') setActivePage('home');
+  };
+
   return (
     <div className="app-wrapper">
       <header className="app-header">
@@ -99,6 +118,23 @@ function App() {
                 {label}
               </button>
             ))}
+            {user ? (
+              <>
+                <button className={`nav-link${activePage === 'my-bookings' ? ' nav-link--active' : ''}`}
+                        onClick={() => setActivePage('my-bookings')}>
+                  My Bookings
+                </button>
+                <div style={{ width: 1, height: 24, background: '#cbd5e1', margin: '0 8px' }} />
+                <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Hi, {user.name.split(' ')[0]}</div>
+                <button onClick={handleLogout} style={{ background: '#fef2f2', color: '#ef4444', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setShowAuth(true)} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginLeft: 10 }}>
+                Login / Register
+              </button>
+            )}
           </nav>
         </div>
       </header>
@@ -128,7 +164,10 @@ function App() {
         )}
 
         {/* ── BOOK TICKET ── */}
-        {activePage === 'book' && <BookingPage />}
+        {activePage === 'book' && <BookingPage user={user} onRequestLogin={() => setShowAuth(true)} />}
+
+        {/* ── MY BOOKINGS ── */}
+        {activePage === 'my-bookings' && user && <UserDashboard />}
 
         {/* ── SUPPORT ── */}
         {activePage === 'support' && (
@@ -140,6 +179,14 @@ function App() {
         )}
 
       </main>
+      
+      {/* ── AUTH MODAL ── */}
+      {showAuth && (
+        <AuthForm 
+          onSuccess={(u) => { setUser(u); setShowAuth(false); }} 
+          onCancel={() => setShowAuth(false)} 
+        />
+      )}
     </div>
   );
 }
