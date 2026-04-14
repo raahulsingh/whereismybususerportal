@@ -55,9 +55,10 @@ body {
   
   /* TicketHome */
   .search-box-container {
+    display: flex !important;
+    align-items: stretch !important;
     flex-direction: column !important;
     gap: 10px !important;
-    padding: 15px !important;
   }
   .search-input-group {
     width: 100% !important;
@@ -114,4 +115,42 @@ body {
     margin: 20px auto !important;
   }
   .mobile-grid-col { grid-template-columns: 1fr !important; }
+}/* Hamburger Menu Styles */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 5px;
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    flex-wrap: nowrap; /* Keep logo and hamburger on same line */
+    position: relative;
+  }
+  .app-nav {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 60px;
+    left: 0;
+    width: 100%;
+    background: white;
+    padding: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    z-index: 1000;
+  }
+  .app-nav.open {
+    display: flex;
+  }
+  .mobile-menu-btn {
+    display: block;
+  }
+  .nav-link {
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px !important;
+  }
 }

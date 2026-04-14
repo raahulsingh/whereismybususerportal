@@ -31,6 +31,7 @@
   font-weight: 700;
   color: var(--text);
   letter-spacing: -.3px;
+  white-space: nowrap;
 }
 
 .app-title span { color: var(--primary); }

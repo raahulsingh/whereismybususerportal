@@ -39,6 +39,7 @@ function App() {
   const [hasSearched, setHasSearched]                 = useState(false);
   const [user, setUser]                               = useState(null);
   const [showAuth, setShowAuth]                       = useState(false);
+  const [menuOpen, setMenuOpen]                       = useState(false);
 
 
   useEffect(() => {
@@ -131,37 +132,43 @@ function App() {
   return (
     <div className="app-wrapper">
       <header className="app-header">
-        <div className="app-header-inner">
+        <div className="app-header-inner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="app-logo">🚌</span>
-            <span className="app-title">Where is my <span>Bus</span></span>
+            <span className="app-title" style={{ fontSize: '1.2rem' }}>Where is my <span>Bus</span></span>
           </div>
-          <nav className="app-nav">
+          
+          {/* Hamburger Icon */}
+          <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
+            {menuOpen ? '✖' : '☰'}
+          </button>
+
+          <nav className={`app-nav ${menuOpen ? 'open' : ''}`}>
             {[
               { key: 'home', label: 'Home' },
               { key: 'book', label: 'Book Ticket' },
-              { key: 'support', label: 'Supports' },
+              { key: 'support', label: 'Support' },
             ].map(({ key, label }) => (
               <button key={key}
                 className={`nav-link${activePage === key ? ' nav-link--active' : ''}`}
-                onClick={() => setActivePage(key)}>
+                onClick={() => { setActivePage(key); setMenuOpen(false); }}>
                 {label}
               </button>
             ))}
             {user ? (
               <>
                 <button className={`nav-link${activePage === 'my-bookings' ? ' nav-link--active' : ''}`}
-                        onClick={() => setActivePage('my-bookings')}>
+                        onClick={() => { setActivePage('my-bookings'); setMenuOpen(false); }}>
                   My Bookings
                 </button>
-                <div style={{ width: 1, height: 24, background: '#cbd5e1', margin: '0 8px' }} />
-                <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Hi, {user.name.split(' ')[0]}</div>
-                <button onClick={handleLogout} style={{ background: '#fef2f2', color: '#ef4444', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                <div className="mobile-hide" style={{ width: 1, height: 24, background: '#cbd5e1', margin: '0 8px' }} />
+                <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600, padding: '10px 16px' }}>Hi, {user.name.split(' ')[0]}</div>
+                <button onClick={() => { handleLogout(); setMenuOpen(false); }} style={{ margin: '0 16px', background: '#fef2f2', color: '#ef4444', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                   Logout
                 </button>
               </>
             ) : (
-              <button onClick={() => setShowAuth(true)} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginLeft: 10 }}>
+              <button onClick={() => { setShowAuth(true); setMenuOpen(false); }} style={{ margin: '10px 16px', background: '#2563eb', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                 Login / Register
               </button>
             )}

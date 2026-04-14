@@ -74,13 +74,13 @@ export default function UserDashboard() {
             const dateStr = isNaN(dt) ? bk.travel_date : dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
             const timeStr = isNaN(dt) ? "—" : dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
             return (
-              <div key={i} style={{ display: 'flex', background: '#fff', borderRadius: 16, boxShadow: '0 4px 16px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-                <div style={{ width: 140, background: '#2563eb', padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+              <div key={i} className="mobile-col" style={{ display: 'flex', background: '#fff', borderRadius: 16, boxShadow: '0 4px 16px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                <div className="mobile-w-100" style={{ width: 140, background: '#2563eb', padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                   <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 4 }}>{dateStr}</div>
                   <div style={{ fontSize: 22, fontWeight: 800 }}>{timeStr}</div>
                   <div style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: 10, fontSize: 12, marginTop: 12, fontWeight: 600 }}>{bk.bus_code}</div>
                 </div>
-                <div style={{ flex: 1, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="mobile-col" style={{ flex: 1, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '15px' }}>
                   <div>
                     <div style={{ fontSize: 13, color: '#94a3b8', fontWeight: 600, letterSpacing: 1, marginBottom: 6 }}>REF: {bk.booking_ref}</div>
                     <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b' }}>
@@ -92,8 +92,8 @@ export default function UserDashboard() {
                       <span style={{ color: bk.status === 'confirmed' ? '#16a34a' : '#ef4444', fontWeight: 600 }}>• {bk.status.toUpperCase()}</span>
                     </div>
                   </div>
-                  <div>
-                    <button onClick={() => handleDownloadTicket(bk)} style={{ padding: '10px 16px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, color: '#2563eb', fontWeight: 700, cursor: 'pointer' }}>
+                  <div className="mobile-w-100">
+                    <button className="mobile-w-100" onClick={() => handleDownloadTicket(bk)} style={{ padding: '10px 16px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, color: '#2563eb', fontWeight: 700, cursor: 'pointer' }}>
                       ⬇ Download
                     </button>
                   </div>
