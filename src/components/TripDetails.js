@@ -82,16 +82,26 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
     setFallbackBusLoc(null);
   }, [initialDetails]);
 
-  // Compute isToday early — needed to guard fallback fetch
   const todayStr = (() => {
     const d = new Date();
     return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-');
   })();
   const isToday = !travelDate || travelDate === todayStr;
 
-  // Fetch last known bus location ONLY for today — when busState is null but bus has location from other trip
+  const isActiveDay = (() => {
+    if (isToday) return true;
+    const firstStop = details?.stops?.[0];
+    const lastStop = details?.stops?.[details?.stops?.length - 1];
+    if (!firstStop?.departureTime || !lastStop?.arrivalTime) return isToday;
+    const start = new Date(firstStop.departureTime);
+    const end = new Date(lastStop.arrivalTime);
+    const now = new Date();
+    return now >= start && now <= new Date(end.getTime() + 4 * 3600 * 1000);
+  })();
+
+  // Fetch last known bus location ONLY for active days — when busState is null but bus has location from other trip
   useEffect(() => {
-    if (!isToday) { setFallbackBusLoc(null); return; }
+    if (!isActiveDay) { setFallbackBusLoc(null); return; }
     if (details?.busState || !details?.hasBusStateForOtherTrip || !details?.busId) return;
     fetch('/api/admin/bus-state')
       .then(r => r.json())
@@ -104,7 +114,7 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
         }
       })
       .catch(() => {});
-  }, [isToday, details?.busState, details?.hasBusStateForOtherTrip, details?.busId]);
+  }, [isActiveDay, details?.busState, details?.hasBusStateForOtherTrip, details?.busId]);
 
   const fetchLatest = async (id) => {
     if (!id) return;
@@ -169,8 +179,10 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
 
   const isUsingFallbackLoc = !busState && !!fallbackBusLoc && !!busLat;
 
-  // If backend returns busState for THIS trip, OR we have fallback GPS data, bus is running
-  const tripStatus = (busState || isUsingFallbackLoc) ? 'active' : scheduledTripStatus;
+  // If backend returns busState for THIS trip, bus is active.
+  // If not, follow scheduled departure window. 
+  // We do NOT let fallback GPS for other trips force this trip into 'active' status.
+  const tripStatus = (busState) ? 'active' : scheduledTripStatus;
 
   return (
     <div className="trip-details-card">
@@ -182,17 +194,17 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
           <div className="trip-route-name">{routeName}</div>
         </div>
         <div className="trip-bus-location">
-          {!isToday ? (
+          {!isActiveDay ? (
             <>
               <div className="trip-near-label">Scheduled departure</div>
               <div className="trip-near-stop">{fmt(firstStop?.departureTime)}</div>
             </>
-          ) : (isUsingFallbackLoc || (busState && tripStatus === 'active')) ? (
+          ) : ((busState || isUsingFallbackLoc) && tripStatus === 'active') ? (
             <>
               <div className="trip-near-label">Bus is near</div>
               <div className="trip-near-stop">{currentName}</div>
-              {isUsingFallbackLoc && fallbackBusLoc?.lastPingAt && (
-                <div className="trip-updated">{timeAgo(fallbackBusLoc.lastPingAt)}</div>
+              {(busState?.lastPingAt || fallbackBusLoc?.lastPingAt) && (
+                <div className="trip-updated">{timeAgo(busState?.lastPingAt || fallbackBusLoc?.lastPingAt)}</div>
               )}
             </>
           ) : tripStatus === 'not_started' ? (
@@ -206,14 +218,14 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
               <div className="trip-near-stop">{currentName}</div>
             </>
           )}
-          {isToday && busState?.lastPingAt && tripStatus === 'active' && (
+          {isActiveDay && busState?.lastPingAt && tripStatus === 'active' && (
             <div className="trip-updated">{timeAgo(busState.lastPingAt)}</div>
           )}
         </div>
       </div>
 
       {/* Auto-refresh bar — only for today */}
-      {isToday && (
+      {isActiveDay && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '6px 10px', background: '#f0f4ff', border: '1px solid #c7d7ff',
@@ -237,7 +249,7 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
       )}
 
       {/* Not started banner */}
-      {isToday && tripStatus === 'not_started' && (
+      {isActiveDay && tripStatus === 'not_started' && (
         <div style={{
           margin: '8px 0', padding: '10px 14px', background: '#e8f4fd',
           border: '1px solid #90caf9', borderRadius: 8, fontSize: 13,
@@ -254,13 +266,40 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
           const isPassed  = currentSeq != null && s.seq < currentSeq;
           const stateClass = isCurrent ? 'is-current' : isPassed ? 'is-passed' : 'is-future';
 
+          const firstUnpassedIdx = stops.findIndex(stop => (currentSeq == null || stop.seq >= currentSeq));
+
           let badge = null;
+          let dayDivider = null;
 
-          if (isToday && !isPassed) {
-            const delayInfo = getDelayInfo(s.arrivalTime);
+          const currentStopDateStr = (s.departureTime || s.arrivalTime)?.substring(0, 10);
+          const prevStopDateStr = i > 0 ? (stops[i-1].departureTime || stops[i-1].arrivalTime)?.substring(0, 10) : null;
+          if (currentStopDateStr && currentStopDateStr !== prevStopDateStr) {
+            const firstStopDateStr = (stops[0].departureTime || stops[0].arrivalTime)?.substring(0, 10);
+            const firstDate = new Date(firstStopDateStr);
+            const currDate = new Date(currentStopDateStr);
+            const dayDiff = Math.round((currDate - firstDate) / (24 * 3600 * 1000)) + 1;
+            const dateFmt = currDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
+            dayDivider = (
+              <div style={{
+                padding: '6px 0', 
+                margin: '10px 0 16px 24px',
+                borderBottom: '1px solid #e2e8f0',
+                color: '#64748b',
+                fontSize: '12px',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px'
+              }}>
+                Day {dayDiff} — {dateFmt}
+              </div>
+            );
+          }
 
-            if (busState || isUsingFallbackLoc) {
-              // ✅ Bus location confirmed (live or fallback GPS) — show actual delay
+          if (isActiveDay && !isPassed) {
+            const delayInfo = getDelayInfo(s.departureTime || s.arrivalTime);
+
+            if (busState) {
+              // ✅ Bus location confirmed (live active trip) — show actual delay
               if (delayInfo?.type === 'late') {
                 badge = (
                   <div style={{
@@ -284,9 +323,8 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
                   </div>
                 );
               }
-            } else {
-              // ✅ No live bus state for this trip — show "Waiting for update"
-              // + how late it is as per schedule
+            } else if (i === firstUnpassedIdx || firstUnpassedIdx === -1) {
+              // ✅ No live bus state for this trip — show "Waiting for update" ONLY on the first un-passed stop
               if (delayInfo?.type === 'late') {
                 badge = (
                   <div style={{
@@ -299,7 +337,6 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
                   </div>
                 );
               } else if (delayInfo?.type === 'ontime' || delayInfo?.type === 'early') {
-                // Scheduled to arrive soon or arriving now — no update yet
                 badge = (
                   <div style={{
                     marginTop: 3, display: 'inline-block',
@@ -315,25 +352,28 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
           }
 
           return (
-            <div key={s.seq ?? i} className={`timeline-item ${stateClass}`}>
-              <div className="timeline-dot" />
-              {i < stops.length - 1 && <div className="timeline-line" />}
-              <div className="timeline-stop-name">
-                {s.stopName}
-                {isCurrent && isToday && <span className="here-badge">Bus here</span>}
+            <React.Fragment key={s.seq ?? i}>
+              {dayDivider}
+              <div className={`timeline-item ${stateClass}`}>
+                <div className="timeline-dot" />
+                {i < stops.length - 1 && <div className="timeline-line" />}
+                <div className="timeline-stop-name">
+                  {s.stopName}
+                  {isCurrent && isActiveDay && <span className="here-badge">Bus here</span>}
+                </div>
+                <div className="timeline-stop-times">
+                  {s.arrivalTime   && <span>🟢 Arr {fmt(s.arrivalTime)}</span>}
+                  {s.departureTime && <span>🔵 Dep {fmt(s.departureTime)}</span>}
+                </div>
+                {badge}
               </div>
-              <div className="timeline-stop-times">
-                {s.arrivalTime   && <span>🟢 Arr {fmt(s.arrivalTime)}</span>}
-                {s.departureTime && <span>🔵 Dep {fmt(s.departureTime)}</span>}
-              </div>
-              {badge}
-            </div>
+            </React.Fragment>
           );
         })}
       </div>
 
       {/* Map */}
-      {isToday && busLat && busLng ? (
+      {isActiveDay && busLat && busLng && tripStatus === 'active' ? (
         <>
           {isUsingFallbackLoc && (
             <div style={{
@@ -342,8 +382,8 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
               color: '#854d0e', fontWeight: 500,
             }}>
               📍 Last known location{fallbackBusLoc?.nearestStopName ? ` (near ${fallbackBusLoc.nearestStopName})` : ''}
-              {fallbackBusLoc?.lastPingAt && (
-                <span style={{ marginLeft: 8, color: '#a16207' }}> · {timeAgo(fallbackBusLoc.lastPingAt)}</span>
+              {(busState?.lastPingAt || fallbackBusLoc?.lastPingAt) && (
+                <span style={{ marginLeft: 8, color: '#a16207' }}> · {timeAgo(busState?.lastPingAt || fallbackBusLoc?.lastPingAt)}</span>
               )}
             </div>
           )}
@@ -351,7 +391,7 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
             <TripMap currentLat={busLat} currentLng={busLng} />
           </div>
         </>
-      ) : isToday ? (
+      ) : isActiveDay && tripStatus === 'active' ? (
         <div className="map-unavailable">
           📍 Live location not available
         </div>

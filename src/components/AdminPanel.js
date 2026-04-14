@@ -192,7 +192,7 @@ export default function AdminPanel() {
   const [trips, setTrips]     = useState([]);
   const [tripType, setTripType] = useState("single"); // NEW: "single" | "bulk"
   const [tripForm, setTripForm] = useState({ busId: "", departureTime: "" });
-  const [bulkTripForm, setBulkTripForm] = useState({ busId: "", startDate: "", endDate: "", time: "" });
+  const [bulkTripForm, setBulkTripForm] = useState({ busId: "", startDate: "", endDate: "", time: "", gapDays: "1" });
 
   const [busStates, setBusStates] = useState([]);
   const [bsForm, setBsForm] = useState({ busId: "", tripId: "", lat: "", lng: "", speedKmph: "", headingDeg: "" });
@@ -328,13 +328,14 @@ export default function AdminPanel() {
         busId: Number(bulkTripForm.busId),
         startDate: bulkTripForm.startDate,
         endDate: bulkTripForm.endDate,
-        departureTime: bulkTripForm.time
+        departureTime: bulkTripForm.time,
+        gapDays: Number(bulkTripForm.gapDays || 1)
       }),
     });
     const data = await res.json();
     if (data.error) { alert("Error: " + data.error); return; }
     alert(`Success: ${data.message} | ${data.stopTimesCreated} stop times generated total.`);
-    setBulkTripForm({ busId: "", startDate: "", endDate: "", time: "" }); loadTrips(selectedRoute);
+    setBulkTripForm({ busId: "", startDate: "", endDate: "", time: "", gapDays: "1" }); loadTrips(selectedRoute);
   };
   const deleteTrip = async id => { await fetch(`/api/admin/trips/${id}`, { method: "DELETE" }); loadTrips(selectedRoute); };
 
@@ -602,6 +603,11 @@ export default function AdminPanel() {
                     Time:
                     <input style={{ ...inp, width: 110 }} type="time" value={bulkTripForm.time}
                       onChange={e => setBulkTripForm({ ...bulkTripForm, time: e.target.value })} />
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500 }} title="Generate trips every N days (1 = everyday, 2 = alternate days)">
+                    Gap (Days):
+                    <input style={{ ...inp, width: 60 }} type="number" min="1" max="30" value={bulkTripForm.gapDays}
+                      onChange={e => setBulkTripForm({ ...bulkTripForm, gapDays: e.target.value })} />
                   </label>
                   <button style={btn()} onClick={addBulkTrips}>+ Create Bulk Trips</button>
                 </div>
