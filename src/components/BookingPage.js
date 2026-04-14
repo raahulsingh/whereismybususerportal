@@ -120,7 +120,7 @@ function SearchSection({ onResults }) {
     <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', padding: 28, maxWidth: 680, margin: '0 auto' }}>
       <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>🎫 Search Bus Tickets</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 10, alignItems: 'end', marginBottom: 14 }}>
+      <div className="search-box-container mobile-col" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 10, alignItems: 'end', marginBottom: 14 }}>
         <StopDropdown label="FROM" allStops={allStops} value={form.from} onChange={v => setForm(f => ({...f, from: v}))} />
         {/* Swap button */}
         <button onClick={() => setForm(f => ({ ...f, from: f.to, to: f.from }))}
@@ -133,8 +133,9 @@ function SearchSection({ onResults }) {
 
       <div style={{ marginBottom: 16 }}>
         <label style={{ fontSize: 12, color: '#64748b', fontWeight: 600, display: 'block', marginBottom: 4 }}>DATE OF JOURNEY</label>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="mobile-wrap" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input type="date" value={form.date} min={todayStr()}
+            className="mobile-w-100"
             onChange={e => setForm(f => ({...f, date: e.target.value}))}
             style={{ flex: 1, padding: '12px 16px', fontSize: 15, borderRadius: 10, border: '1.5px solid #e2e8f0', outline: 'none' }} />
           <button onClick={() => setDay(0)} style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0',
@@ -177,7 +178,7 @@ function BusList({ results, searchInfo, onSelect }) {
           onMouseEnter={e => e.currentTarget.style.borderColor = '#2563eb'}
           onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="trip-card-row mobile-col" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 17 }}>🚌 {bus.busCode}</div>
               <div style={{ fontSize: 13, color: '#64748b' }}>{bus.routeName}</div>
@@ -197,7 +198,7 @@ function BusList({ results, searchInfo, onSelect }) {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+          <div className="trip-times-col mobile-col" style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 18, fontWeight: 700 }}>{fmt(bus.fromTime)}</div>
               <div style={{ fontSize: 12, color: '#64748b' }}>{bus.fromStopName}</div>
@@ -375,7 +376,7 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
           <div style={{ textAlign: 'center', marginBottom: 16, fontSize: 20 }}>🚗 Driver</div>
 
           {/* Seat Grid */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+          <div className="seat-grid-container" style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
             {rows.map(row => (
               <div key={row} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                 <div style={{ width: 22, fontSize: 11, color: '#94a3b8', textAlign: 'right', paddingTop: 18 }}>{row+1}</div>
@@ -435,10 +436,10 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
           </div>
 
           {/* Selected summary bar */}
-          <div style={{ marginTop: 20, padding: '14px 18px', background: selected.length > 0 ? '#eff6ff' : '#f8fafc',
-            borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          <div className="mobile-col" style={{ marginTop: 20, padding: '14px 18px', background: selected.length > 0 ? '#eff6ff' : '#f8fafc',
+            borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
             border: '1.5px solid ' + (selected.length > 0 ? '#bfdbfe' : '#e2e8f0') }}>
-            <div>
+            <div style={{ flex: 1 }}>
               {selected.length === 0
                 ? <span style={{ color: '#94a3b8', fontSize: 14 }}>Select seat(s)</span>
                 : <>
@@ -453,8 +454,8 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
                   </>
               }
             </div>
-            <button onClick={goToPassenger} disabled={selected.length === 0}
-              style={{ background: selected.length > 0 ? '#2563eb' : '#cbd5e1', color: '#fff',
+            <button className="mobile-w-100" onClick={goToPassenger} disabled={selected.length === 0} style={{
+              padding: '12px 24px', background: selected.length > 0 ? '#16a34a' : '#cbd5e1', color: '#fff',
                 border: 'none', borderRadius: 8, padding: '10px 22px',
                 fontWeight: 700, cursor: selected.length > 0 ? 'pointer' : 'not-allowed', fontSize: 14 }}>
               Continue →
@@ -732,7 +733,7 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
         <span>{'\ud83d\udcb0'} Easy Refunds</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 0, background: '#f8fafc',
+      <div className="mobile-grid-col" style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 0, background: '#f8fafc',
         borderRadius: '0 0 16px 16px', overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.08)' }}>
         
         {/* LEFT: Payment Info */}
@@ -1070,7 +1071,7 @@ function BookingConfirmed({ bookingData, trip, seats, passengers, onDone, onBook
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+        <div className="mobile-col" style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
           <button onClick={handlePrint} style={{
             flex: 1, padding: 14, background: '#f8fafc', color: '#475569',
             border: '1.5px solid #e2e8f0', borderRadius: 10, fontWeight: 700, cursor: 'pointer',
@@ -1089,7 +1090,7 @@ function BookingConfirmed({ bookingData, trip, seats, passengers, onDone, onBook
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div className="mobile-col" style={{ display: 'flex', gap: 10 }}>
           {onBookMore && (
             <button onClick={onBookMore} style={{
               flex: 1, padding: 14, background: '#f0fdf4', color: '#16a34a',

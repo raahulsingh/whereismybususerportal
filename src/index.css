@@ -36,4 +36,82 @@ body {
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+}/* -- Mobile Responsive Utilities ------------------------------- */
+
+@media (max-width: 768px) {
+  /* Common Resets */
+  .mobile-col {
+    flex-direction: column !important;
+  }
+  .mobile-wrap {
+    flex-wrap: wrap !important;
+  }
+  .mobile-w-100 {
+    width: 100% !important;
+  }
+  .mobile-hide {
+    display: none !important;
+  }
+  
+  /* TicketHome */
+  .search-box-container {
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 15px !important;
+  }
+  .search-input-group {
+    width: 100% !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  
+  .trip-card-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 15px !important;
+    padding: 15px !important;
+  }
+  
+  .trip-times-col {
+    width: 100% !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+  }
+
+  /* BookingPage */
+  .booking-main-container {
+    flex-direction: column !important;
+  }
+  .booking-left-panel, .booking-right-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    position: static !important; /* disable sticky on mobile */
+  }
+  
+  /* Seat Layout Scale */
+  .seat-grid-container {
+    transform: scale(0.85);
+    transform-origin: top center;
+    margin-bottom: -100px; /* offset the scale */
+  }
+  
+  /* Header and Nav */
+  .app-header {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 15px !important;
+  }
+  
+  .app-header-nav {
+    display: none; /* simple hide for nav on very small screens, or we can make a hamburger */
+  }
+  
+  /* Modal / Overlays */
+  .app-modal {
+    width: 95% !important;
+    padding: 20px !important;
+    margin: 20px auto !important;
+  }
+  .mobile-grid-col { grid-template-columns: 1fr !important; }
 }

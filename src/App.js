@@ -98,6 +98,36 @@ function App() {
     if(activePage === 'my-bookings' || activePage === 'book') setActivePage('home');
   };
 
+  // ── AUTO LOGOUT ON INACTIVITY ──
+  useEffect(() => {
+    if (!user) return; // Only track when logged in
+
+    let timeoutId;
+    const INACTIVITY_TIME = 10 * 60 * 1000; // 10 minutes
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleLogout();
+        alert('You have been logged out due to 10 minutes of inactivity.');
+      }, INACTIVITY_TIME);
+    };
+
+    // List of events representing user activity
+    const events = ['mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    
+    // Start tracking immediately
+    resetTimer();
+
+    events.forEach(e => window.addEventListener(e, resetTimer));
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(e => window.removeEventListener(e, resetTimer));
+    };
+  }, [user, activePage]); // include activePage so the closure inside handleLogout has the latest page info
+
+
   return (
     <div className="app-wrapper">
       <header className="app-header">
