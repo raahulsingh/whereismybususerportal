@@ -166,7 +166,9 @@ function BusList({ results, searchInfo, onSelect }) {
       <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12 }}>
         <strong>{results.length} buses</strong> found — {searchInfo.from} → {searchInfo.to} · {fmtDate(searchInfo.date)}
       </div>
-      {results.map((bus, i) => (
+      {results.map((bus, i) => {
+        const hasSleeperPrice = bus.sleeperPrice && Number(bus.sleeperPrice) !== Number(bus.price);
+        return (
         <div key={i} onClick={() => onSelect(bus)} style={{
           background: '#fff', borderRadius: 12, padding: '18px 22px', marginBottom: 12,
           boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer',
@@ -181,8 +183,18 @@ function BusList({ results, searchInfo, onSelect }) {
               <div style={{ fontSize: 13, color: '#64748b' }}>{bus.routeName}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#2563eb' }}>₹{Number(bus.price).toFixed(0)}</div>
-              <div style={{ fontSize: 12, color: '#94a3b8' }}>per seat</div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>₹{Number(bus.price).toFixed(0)}</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8' }}>💺 Seat</div>
+                </div>
+                {hasSleeperPrice && (
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#7c3aed' }}>₹{Number(bus.sleeperPrice).toFixed(0)}</div>
+                    <div style={{ fontSize: 10, color: '#94a3b8' }}>🛏️ Sleeper</div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
@@ -209,7 +221,8 @@ function BusList({ results, searchInfo, onSelect }) {
             </span>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -218,21 +231,23 @@ function BusList({ results, searchInfo, onSelect }) {
 function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
   const [layout, setLayout]     = useState(null);
   const [booked, setBooked]     = useState([]);
-  const [selected, setSelected] = useState([]); // ✅ Array for multiple seats
+  const [selected, setSelected] = useState([]); // Array of { seatNo, type, price }
   const [loading, setLoading]   = useState(true);
-  const [step, setStep]         = useState('seats'); // 'seats' | 'passenger'
+  const [step, setStep]         = useState('seats');
   const [error, setError]       = useState('');
   const [booking, setBooking]   = useState(false);
-
-  // Per-passenger form — one entry per selected seat
+  const [viewDeck, setViewDeck] = useState('lower');
   const [passengers, setPassengers] = useState([]);
+
+  const seatPrice = Number(trip.price);
+  const sleeperPrice = trip.sleeperPrice ? Number(trip.sleeperPrice) : seatPrice * 1.5;
 
   const generateLayout = () => {
     const cols = ['A','B','C','D'];
     const seats = [];
     for (let row = 0; row < 10; row++)
       for (let col = 0; col < 4; col++)
-        seats.push({ seatNo: cols[col]+(row+1), row, col, type: col===0||col===3?'window':'aisle' });
+        seats.push({ seatNo: cols[col]+(row+1), row, col, type: 'seat', deck: 'lower' });
     return seats;
   };
 
@@ -243,7 +258,12 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
         if (d.layoutJson) {
           try {
             const parsed = JSON.parse(d.layoutJson);
-            setLayout(parsed.length > 0 ? parsed : generateLayout());
+            if (parsed.length > 0) {
+              const normalized = parsed.map(s => ({
+                ...s, type: s.type || 'seat', deck: s.deck || 'lower',
+              }));
+              setLayout(normalized);
+            } else { setLayout(generateLayout()); }
           } catch { setLayout(generateLayout()); }
         } else { setLayout(generateLayout()); }
         setBooked(d.bookedSeats || []);
@@ -252,28 +272,28 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
       .finally(() => setLoading(false));
   }, [trip.tripId]);
 
-  const rows = layout ? [...new Set(layout.map(s => s.row))].sort((a,b)=>a-b) : [];
-  const cols = layout ? [...new Set(layout.map(s => s.col))].sort((a,b)=>a-b) : [];
+  const hasUpperDeck = layout ? layout.some(s => s.deck === 'upper') : false;
+  const deckSeats = layout ? layout.filter(s => (s.deck || 'lower') === viewDeck) : [];
+  const rows = deckSeats.length > 0 ? [...new Set(deckSeats.map(s => s.row))].sort((a,b)=>a-b) : [];
+  const cols = deckSeats.length > 0 ? [...new Set(deckSeats.map(s => s.col))].sort((a,b)=>a-b) : [];
 
-  // Toggle seat selection
-  const toggleSeat = (seatNo) => {
+  const getPriceForType = (type) => type === 'sleeper' ? sleeperPrice : seatPrice;
+
+  const toggleSeat = (seatNo, seatType) => {
     setSelected(prev => {
-      if (prev.includes(seatNo)) return prev.filter(s => s !== seatNo);
-      return [...prev, seatNo];
+      if (prev.find(s => s.seatNo === seatNo)) return prev.filter(s => s.seatNo !== seatNo);
+      return [...prev, { seatNo, type: seatType || 'seat', price: getPriceForType(seatType || 'seat') }];
     });
   };
 
-  // When moving to passenger step, init passenger forms
+  const totalAmount = selected.reduce((sum, s) => sum + s.price, 0);
+
   const goToPassenger = () => {
     if (selected.length === 0) { setError('Select at least one seat'); return; }
     setError('');
-    
-    // Auto-fill first passenger from logged in user
-    setPassengers(selected.map((seatNo, i) => {
-      if (i === 0 && user) {
-        return { seatNo, name: user.name || '', age: user.age || '', gender: 'Male', phone: user.phone || '', email: user.email || '' };
-      }
-      return { seatNo, name: '', age: '', gender: 'Male', phone: '', email: '' };
+    setPassengers(selected.map((seat, i) => {
+      if (i === 0 && user) return { seatNo: seat.seatNo, name: user.name || '', age: user.age || '', gender: 'Male', phone: user.phone || '', email: user.email || '' };
+      return { seatNo: seat.seatNo, name: '', age: '', gender: 'Male', phone: '', email: '' };
     }));
     setStep('passenger');
   };
@@ -283,7 +303,6 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
   };
 
   const confirmBooking = () => {
-    // Validate
     for (let i = 0; i < passengers.length; i++) {
       if (!passengers[i].name.trim() || !passengers[i].phone.trim()) {
         setError(`Passenger ${i+1} (Seat ${passengers[i].seatNo}): Name and phone number are required.`);
@@ -291,24 +310,24 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
       }
     }
     setError('');
-    // Go to payment page instead of booking directly
-    if (onGoToPayment) {
-      onGoToPayment(selected, passengers);
-    }
+    if (onGoToPayment) onGoToPayment(selected, passengers);
   };
 
-  const totalAmount = selected.length * Number(trip.price);
   const inp = { padding: '9px 12px', fontSize: 13, borderRadius: 8, border: '1.5px solid #e2e8f0', outline: 'none', width: '100%', boxSizing: 'border-box' };
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Loading seats…</div>;
+
+  const aisleAfter = 1; // aisle gap after column index 1
 
   return (
     <div style={{ maxWidth: 740, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ background: '#fff', borderRadius: 12, padding: '16px 22px', marginBottom: 16, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
         <div style={{ fontWeight: 700, fontSize: 17 }}>🚌 {trip.busCode} — {trip.routeName}</div>
-        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-          {fmt(trip.fromTime)} → {fmt(trip.toTime)} &nbsp;·&nbsp; ₹{Number(trip.price).toFixed(0)} per seat
+        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <span>{fmt(trip.fromTime)} → {fmt(trip.toTime)}</span>
+          <span style={{ color: '#16a34a', fontWeight: 700 }}>💺 ₹{seatPrice.toFixed(0)}</span>
+          {sleeperPrice !== seatPrice && <span style={{ color: '#7c3aed', fontWeight: 700 }}>🛏️ ₹{sleeperPrice.toFixed(0)}</span>}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           {['seats','passenger'].map((s,i) => (
@@ -324,49 +343,90 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
       {step === 'seats' && (
         <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
           {/* Legend */}
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 12 }}>
-            {[['#f0fdf4','#22c55e','Available'],['#fef9c3','#f59e0b','Selected'],['#f1f5f9','#cbd5e1','Booked']].map(([bg,col,label]) => (
+          <div style={{ display: 'flex', gap: 14, marginBottom: 16, fontSize: 12, flexWrap: 'wrap' }}>
+            {[
+              ['linear-gradient(135deg, #ecfdf5, #d1fae5)','#22c55e','💺 Seat'],
+              ['linear-gradient(135deg, #ede9fe, #ddd6fe)','#a78bfa','🛏️ Sleeper'],
+              ['#fef9c3','#f59e0b','✅ Selected'],
+              ['#f1f5f9','#cbd5e1','🚫 Booked'],
+            ].map(([bg,col,label]) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 18, height: 18, background: bg, border: `2px solid ${col}`, borderRadius: 4 }} />
+                <div style={{ width: 20, height: label.includes('Sleeper') ? 32 : 20, background: bg, border: `2px solid ${col}`, borderRadius: 5 }} />
                 <span style={{ color: '#475569' }}>{label}</span>
               </div>
             ))}
           </div>
 
+          {/* Deck tabs */}
+          {hasUpperDeck && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+              {[['lower', '⬇️ Lower Deck', '#2563eb'], ['upper', '⬆️ Upper Deck', '#7c3aed']].map(([d, lbl, clr]) => (
+                <button key={d} onClick={() => setViewDeck(d)} style={{
+                  padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  fontWeight: 700, fontSize: 13,
+                  background: viewDeck === d ? clr : '#f1f5f9',
+                  color: viewDeck === d ? '#fff' : '#64748b',
+                }}>{lbl}</button>
+              ))}
+            </div>
+          )}
+
           {/* Driver */}
           <div style={{ textAlign: 'center', marginBottom: 16, fontSize: 20 }}>🚗 Driver</div>
 
           {/* Seat Grid */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
             {rows.map(row => (
-              <div key={row} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <div style={{ width: 22, fontSize: 11, color: '#94a3b8', textAlign: 'right' }}>{row+1}</div>
+              <div key={row} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                <div style={{ width: 22, fontSize: 11, color: '#94a3b8', textAlign: 'right', paddingTop: 18 }}>{row+1}</div>
                 {cols.map(col => {
-                  const seat = layout.find(s => s.row===row && s.col===col);
-                  const isBooked   = seat ? booked.includes(seat.seatNo) : false;
-                  const isSelected = seat ? selected.includes(seat.seatNo) : false;
+                  const seat = deckSeats.find(s => s.row===row && s.col===col);
+                  if (!seat) return (
+                    <React.Fragment key={col}>
+                      {col === aisleAfter + 1 && <div style={{ width: 24 }} />}
+                      <div style={{ width: 54 }} />
+                    </React.Fragment>
+                  );
+
+                  const isBooked   = booked.includes(seat.seatNo);
+                  const isSelected = selected.some(s => s.seatNo === seat.seatNo);
+                  const isSleeper  = seat.type === 'sleeper';
+                  const price = getPriceForType(seat.type);
+
+                  const seatH = isSleeper ? 120 : 58;
+
+                  let bg, border, color;
+                  if (isBooked) {
+                    bg = '#f1f5f9'; border = '2px solid #cbd5e1'; color = '#94a3b8';
+                  } else if (isSelected) {
+                    bg = '#fef9c3'; border = '2px solid #f59e0b'; color = '#854d0e';
+                  } else if (isSleeper) {
+                    bg = 'linear-gradient(135deg, #ede9fe, #ddd6fe)'; border = '2px solid #a78bfa'; color = '#5b21b6';
+                  } else {
+                    bg = 'linear-gradient(135deg, #ecfdf5, #d1fae5)'; border = '2px solid #6ee7b7'; color = '#15803d';
+                  }
+
                   return (
                     <React.Fragment key={col}>
-                      {col === 2 && <div style={{ width: 24 }} />}
-                      {seat ? (
-                        <div onClick={() => !isBooked && toggleSeat(seat.seatNo)} title={seat.seatNo}
-                          style={{
-                            width: 54, height: 58, borderRadius: 10,
-                            display: 'flex', flexDirection: 'column',
-                            alignItems: 'center', justifyContent: 'center',
-                            fontSize: 11, fontWeight: 700,
-                            cursor: isBooked ? 'not-allowed' : 'pointer', transition: 'all 0.12s',
-                            background: isBooked ? '#f1f5f9' : isSelected ? '#fef9c3' : '#f0fdf4',
-                            border: `2px solid ${isBooked ? '#cbd5e1' : isSelected ? '#f59e0b' : '#22c55e'}`,
-                            color: isBooked ? '#94a3b8' : isSelected ? '#854d0e' : '#15803d',
-                            transform: isSelected ? 'scale(1.1)' : 'scale(1)',
-                            boxShadow: isSelected ? '0 0 0 3px #fcd34d55' : '0 1px 4px rgba(0,0,0,0.07)',
-                          }}>
-                          <span style={{ fontSize: 18 }}>{isBooked ? '🚫' : isSelected ? '✅' : '💺'}</span>
-                          <span style={{ fontSize: 12 }}>{seat.seatNo}</span>
-                          {!isBooked && <span style={{ fontSize: 9, color: '#475569', marginTop: 1 }}>₹{Number(trip.price).toFixed(0)}</span>}
-                        </div>
-                      ) : <div style={{ width: 54 }} />}
+                      {col === aisleAfter + 1 && <div style={{ width: 24 }} />}
+                      <div onClick={() => !isBooked && toggleSeat(seat.seatNo, seat.type)}
+                        title={`${seat.seatNo} — ${isSleeper ? 'Sleeper' : 'Seat'} ₹${price}`}
+                        style={{
+                          width: 54, height: seatH, borderRadius: isSleeper ? 14 : 10,
+                          display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center',
+                          fontSize: 11, fontWeight: 700,
+                          cursor: isBooked ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
+                          background: bg, border, color,
+                          transform: isSelected ? 'scale(1.08)' : 'scale(1)',
+                          boxShadow: isSelected ? '0 0 0 3px #fcd34d55' : '0 1px 4px rgba(0,0,0,0.07)',
+                        }}>
+                        <span style={{ fontSize: isSleeper ? 26 : 18 }}>
+                          {isBooked ? '🚫' : isSelected ? '✅' : isSleeper ? '🛏️' : '💺'}
+                        </span>
+                        <span style={{ fontSize: 11 }}>{seat.seatNo}</span>
+                        {!isBooked && <span style={{ fontSize: 9, color: isSelected ? '#854d0e' : color, marginTop: 1 }}>₹{price.toFixed(0)}</span>}
+                      </div>
                     </React.Fragment>
                   );
                 })}
@@ -383,11 +443,13 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
                 ? <span style={{ color: '#94a3b8', fontSize: 14 }}>Select seat(s)</span>
                 : <>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>
-                      {selected.length} seat{selected.length > 1 ? 's' : ''} selected: {selected.join(', ')}
+                      {selected.length} seat{selected.length > 1 ? 's' : ''}: {selected.map(s => s.seatNo).join(', ')}
                     </div>
-                    <div style={{ fontSize: 13, color: '#2563eb', marginTop: 2 }}>
-                      Total: ₹{totalAmount.toFixed(0)}
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                      {selected.filter(s => s.type === 'seat').length > 0 && <span style={{ marginRight: 10 }}>💺 {selected.filter(s => s.type === 'seat').length} × ₹{seatPrice.toFixed(0)}</span>}
+                      {selected.filter(s => s.type === 'sleeper').length > 0 && <span>🛏️ {selected.filter(s => s.type === 'sleeper').length} × ₹{sleeperPrice.toFixed(0)}</span>}
                     </div>
+                    <div style={{ fontSize: 14, color: '#2563eb', fontWeight: 700, marginTop: 2 }}>Total: ₹{totalAmount.toFixed(0)}</div>
                   </>
               }
             </div>
@@ -405,21 +467,23 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
       {/* ── PASSENGER FORMS ── */}
       {step === 'passenger' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {passengers.map((p, idx) => (
+          {passengers.map((p, idx) => {
+            const seatInfo = selected.find(s => s.seatNo === p.seatNo);
+            const isSleeper = seatInfo && seatInfo.type === 'sleeper';
+            return (
             <div key={p.seatNo} style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14, color: '#2563eb' }}>
-                💺 Seat {p.seatNo} — Passenger {idx + 1}
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14, color: isSleeper ? '#7c3aed' : '#2563eb' }}>
+                {isSleeper ? '🛏️' : '💺'} {isSleeper ? 'Sleeper' : 'Seat'} {p.seatNo} — Passenger {idx + 1}
+                <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b', marginLeft: 8 }}>₹{(seatInfo?.price || seatPrice).toFixed(0)}</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div style={{ gridColumn: '1/-1' }}>
                   <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>FULL NAME *</label>
-                  <input style={inp} placeholder="Passenger name"
-                    value={p.name} onChange={e => updatePassenger(idx, 'name', e.target.value)} />
+                  <input style={inp} placeholder="Passenger name" value={p.name} onChange={e => updatePassenger(idx, 'name', e.target.value)} />
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>AGE</label>
-                  <input style={inp} type="number" placeholder="Age"
-                    value={p.age} onChange={e => updatePassenger(idx, 'age', e.target.value)} />
+                  <input style={inp} type="number" placeholder="Age" value={p.age} onChange={e => updatePassenger(idx, 'age', e.target.value)} />
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>GENDER</label>
@@ -429,24 +493,26 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>PHONE *</label>
-                  <input style={inp} placeholder="Mobile number"
-                    value={p.phone} onChange={e => updatePassenger(idx, 'phone', e.target.value)} />
+                  <input style={inp} placeholder="Mobile number" value={p.phone} onChange={e => updatePassenger(idx, 'phone', e.target.value)} />
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>EMAIL</label>
-                  <input style={inp} type="email" placeholder="Email (optional)"
-                    value={p.email} onChange={e => updatePassenger(idx, 'email', e.target.value)} />
+                  <input style={inp} type="email" placeholder="Email (optional)" value={p.email} onChange={e => updatePassenger(idx, 'email', e.target.value)} />
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
 
           {/* Total summary */}
           <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12, padding: '14px 18px',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontWeight: 700 }}>{selected.length} Seat{selected.length>1?'s':''}: {selected.join(', ')}</div>
-              <div style={{ fontSize: 13, color: '#64748b' }}>₹{Number(trip.price).toFixed(0)} × {selected.length}</div>
+              <div style={{ fontWeight: 700 }}>{selected.length} Seat{selected.length>1?'s':''}: {selected.map(s => s.seatNo).join(', ')}</div>
+              <div style={{ fontSize: 13, color: '#64748b' }}>
+                {selected.filter(s => s.type === 'seat').length > 0 && <span>💺 {selected.filter(s => s.type === 'seat').length} × ₹{seatPrice.toFixed(0)}</span>}
+                {selected.filter(s => s.type === 'sleeper').length > 0 && <span style={{ marginLeft: 8 }}>🛏️ {selected.filter(s => s.type === 'sleeper').length} × ₹{sleeperPrice.toFixed(0)}</span>}
+              </div>
             </div>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#16a34a' }}>₹{totalAmount.toFixed(0)}</div>
           </div>
@@ -471,6 +537,7 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
   );
 }
 
+
 // ── Step 3.5: Payment Gateway (Razorpay) ─────────────────────────
 function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, onBack }) {
   const [loading, setLoading]       = useState(false);
@@ -478,7 +545,10 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
   const [paymentStage, setPaymentStage] = useState('summary'); // 'summary' | 'processing' | 'success' | 'failed'
   const [paymentId, setPaymentId]   = useState('');
 
-  const baseAmount = seats.length * Number(trip.price);
+  // Calculate from individual seat prices if available (seat vs sleeper may differ)
+  const baseAmount = Array.isArray(seats) && seats.length > 0 && typeof seats[0] === 'object'
+    ? seats.reduce((sum, s) => sum + (s.price || Number(trip.price)), 0)
+    : seats.length * Number(trip.price);
   const gstRate = 0.05;
   const gstAmount = Math.round(baseAmount * gstRate * 100) / 100;
   const totalAmount = Math.round((baseAmount + gstAmount) * 100) / 100;
@@ -519,7 +589,7 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
         },
         notes: {
           tripId: trip.tripId,
-          seats: seats.join(','),
+          seats: (Array.isArray(seats) && seats.length > 0 && typeof seats[0] === 'object') ? seats.map(s => s.seatNo).join(',') : seats.join(','),
           route: `${searchInfo.from} \u2192 ${searchInfo.to}`,
           date: searchInfo.date,
         },
@@ -761,6 +831,29 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
             <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 4 }}>Fare Breakup</div>
             <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>{seats.length} Seat{seats.length > 1 ? 's' : ''}</div>
 
+            {/* Per-type breakdown */}
+            {(() => {
+              const seatItems = Array.isArray(seats) && seats.length > 0 && typeof seats[0] === 'object' ? seats : [];
+              const seatTypeSeats = seatItems.filter(s => s.type === 'seat');
+              const sleeperSeats = seatItems.filter(s => s.type === 'sleeper');
+              return seatItems.length > 0 ? (
+                <div style={{ marginBottom: 8 }}>
+                  {seatTypeSeats.length > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                      <span style={{ color: '#475569' }}>{'\ud83d\udcba'} Seat \u00d7 {seatTypeSeats.length}</span>
+                      <span style={{ fontWeight: 600 }}>{'\u20b9'}{(seatTypeSeats.reduce((s,x) => s + x.price, 0)).toFixed(0)}</span>
+                    </div>
+                  )}
+                  {sleeperSeats.length > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                      <span style={{ color: '#7c3aed' }}>{'\ud83d\udecf\ufe0f'} Sleeper \u00d7 {sleeperSeats.length}</span>
+                      <span style={{ fontWeight: 600, color: '#7c3aed' }}>{'\u20b9'}{(sleeperSeats.reduce((s,x) => s + x.price, 0)).toFixed(0)}</span>
+                    </div>
+                  )}
+                </div>
+              ) : null;
+            })()}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
               <span style={{ color: '#475569' }}>Base Fare</span>
               <span style={{ fontWeight: 600 }}>{'\u20b9'}{baseAmount.toFixed(0)}</span>
@@ -841,7 +934,9 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
 
 // ── Step 4: Booking Confirmed ────────────────────────────────────
 function BookingConfirmed({ bookingData, trip, seats, passengers, onDone, onBookMore, searchInfo }) {
-  const totalAmount = seats.length * Number(trip.price);
+  const totalAmount = Array.isArray(seats) && seats.length > 0 && typeof seats[0] === 'object'
+    ? seats.reduce((sum, s) => sum + (s.price || Number(trip.price)), 0)
+    : seats.length * Number(trip.price);
   const printRef = React.useRef(null);
 
   const handlePrint = () => {
@@ -879,7 +974,7 @@ function BookingConfirmed({ bookingData, trip, seats, passengers, onDone, onBook
           <div class="row"><span class="label">Bus</span><span class="value">${trip.busCode}</span></div>
           <div class="row"><span class="label">Route</span><span class="value">${trip.fromStopName} → ${trip.toStopName}</span></div>
           <div class="row"><span class="label">Departure</span><span class="value">${fmt(trip.fromTime)}</span></div>
-          <div class="row"><span class="label">Amount</span><span class="value" style="color:#16a34a">₹${Number(trip.price).toFixed(0)}</span></div>
+          <div class="row"><span class="label">Amount</span><span class="value" style="color:#16a34a">₹${(Array.isArray(seats) && seats[i] && typeof seats[i] === 'object') ? seats[i].price.toFixed(0) : Number(trip.price).toFixed(0)}</span></div>
         </div>
       `).join('')}
       <div class="total"><span>Total Paid</span><span class="amt">₹${totalAmount.toFixed(0)}</span></div>
@@ -938,8 +1033,8 @@ function BookingConfirmed({ bookingData, trip, seats, passengers, onDone, onBook
                   {bookingData.bookingRefs?.[i] || '—'}
                 </div>
               </div>
-              <div style={{ background: '#2563eb', color: '#fff', borderRadius: 8, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
-                Seat {p.seatNo}
+              <div style={{ background: (Array.isArray(seats) && seats[i] && typeof seats[i] === 'object' && seats[i].type === 'sleeper') ? '#7c3aed' : '#2563eb', color: '#fff', borderRadius: 8, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
+                {(Array.isArray(seats) && seats[i] && typeof seats[i] === 'object' && seats[i].type === 'sleeper') ? '🛏️ Sleeper' : '💺 Seat'} {p.seatNo}
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13 }}>
@@ -962,7 +1057,7 @@ function BookingConfirmed({ bookingData, trip, seats, passengers, onDone, onBook
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Amount</span>
-                <strong style={{ color: '#16a34a' }}>₹{Number(trip.price).toFixed(0)}</strong>
+                <strong style={{ color: '#16a34a' }}>₹{(Array.isArray(seats) && seats[i] && typeof seats[i] === 'object') ? seats[i].price.toFixed(0) : Number(trip.price).toFixed(0)}</strong>
               </div>
             </div>
           </div>
@@ -1071,7 +1166,7 @@ export default function BookingPage({ user, onRequestLogin }) {
             passengerEmail: p.email,
             fromStop: searchInfo.from,
             toStop: searchInfo.to,
-            amount: selectedTrip.price,
+            amount: (paymentSeats.find(s => typeof s === 'object' && s.seatNo === p.seatNo) || {}).price || selectedTrip.price,
             travelDate: searchInfo.date || '',
             userId: user ? user.id : null
           }),
