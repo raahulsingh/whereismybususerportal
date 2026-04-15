@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getApiUrl } from '../apiConfig';
 import TripMap from './TripMap';
 
 function fmt(t) {
@@ -103,7 +104,7 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
   useEffect(() => {
     if (!isActiveDay) { setFallbackBusLoc(null); return; }
     if (details?.busState || !details?.hasBusStateForOtherTrip || !details?.busId) return;
-    fetch('/api/admin/bus-state')
+    fetch(getApiUrl('/api/admin/bus-state'))
       .then(r => r.json())
       .then(states => {
         const match = (Array.isArray(states) ? states : []).find(
@@ -120,7 +121,7 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
     if (!id) return;
     setRefreshing(true);
     try {
-      const res  = await fetch(`/api/trips/${id}/details`);
+      const res  = await fetch(getApiUrl(`/api/trips/${id}/details`));
       const data = await res.json();
       setDetails(data);
       setLastRefresh(new Date());

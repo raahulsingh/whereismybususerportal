@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getApiUrl } from "../apiConfig";
 
 // ── Password Gate ──────────────────────────────────────────────
 function LoginGate({ onLogin }) {
@@ -11,7 +12,7 @@ function LoginGate({ onLogin }) {
     setLoading(true);
     setErr("");
     try {
-      const res = await fetch("/api/booking/admin/login", {
+      const res = await fetch(getApiUrl("/api/booking/admin/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pw }),
@@ -75,7 +76,7 @@ function StopTimesModal({ tripId, tripInfo, onClose }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/admin/trips/${tripId}/stop-times`)
+    fetch(getApiUrl(`/api/admin/trips/${tripId}/stop-times`))
       .then(r => r.json())
       .then(d => setStopTimes(Array.isArray(d) ? d : []))
       .catch(() => setStopTimes([]))
@@ -211,12 +212,12 @@ export default function AdminPanel() {
   const [stopTimesModal, setStopTimesModal] = useState(null); // { tripId, tripInfo }
 
   // ── loaders ──
-  const loadRoutes  = () => fetch("/api/admin/routes").then(r => r.json()).then(d => setRoutes(Array.isArray(d) ? d : []));
-  const loadDrivers = () => fetch("/api/admin/drivers").then(r => r.json()).then(d => setDrivers(Array.isArray(d) ? d : []));
-  const loadStops   = id => fetch(`/api/admin/routes/${id}/stops`).then(r => r.json()).then(d => setStops(Array.isArray(d) ? d : []));
-  const loadBuses   = id => fetch(`/api/admin/routes/${id}/buses`).then(r => r.json()).then(d => setBuses(Array.isArray(d) ? d : []));
-  const loadTrips   = id => fetch(`/api/admin/routes/${id}/trips`).then(r => r.json()).then(d => setTrips(Array.isArray(d) ? d : []));
-  const loadBusStates = () => fetch("/api/admin/bus-state").then(r => r.json()).then(d => setBusStates(Array.isArray(d) ? d : []));
+  const loadRoutes  = () => fetch(getApiUrl("/api/admin/routes")).then(r => r.json()).then(d => setRoutes(Array.isArray(d) ? d : []));
+  const loadDrivers = () => fetch(getApiUrl("/api/admin/drivers")).then(r => r.json()).then(d => setDrivers(Array.isArray(d) ? d : []));
+  const loadStops   = id => fetch(getApiUrl(`/api/admin/routes/${id}/stops`)).then(r => r.json()).then(d => setStops(Array.isArray(d) ? d : []));
+  const loadBuses   = id => fetch(getApiUrl(`/api/admin/routes/${id}/buses`)).then(r => r.json()).then(d => setBuses(Array.isArray(d) ? d : []));
+  const loadTrips   = id => fetch(getApiUrl(`/api/admin/routes/${id}/trips`)).then(r => r.json()).then(d => setTrips(Array.isArray(d) ? d : []));
+  const loadBusStates = () => fetch(getApiUrl("/api/admin/bus-state")).then(r => r.json()).then(d => setBusStates(Array.isArray(d) ? d : []));
 
   useEffect(() => {
     if (authed) { loadRoutes(); loadDrivers(); loadBusStates(); }
@@ -228,7 +229,7 @@ export default function AdminPanel() {
     loadBuses(r.id);
     loadTrips(r.id);
     // ✅ Load stops for bus-state dropdown too
-    fetch(`/api/admin/routes/${r.id}/stops`)
+    fetch(getApiUrl(`/api/admin/routes/${r.id}/stops`))
       .then(res => res.json())
       .then(d => setAllStopsForBs(Array.isArray(d) ? d : []));
   };
@@ -236,11 +237,11 @@ export default function AdminPanel() {
   // ── Routes ──
   const addRoute = async () => {
     if (!newRoute.trim()) return;
-    await fetch("/api/admin/routes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newRoute }) });
+    await fetch(getApiUrl("/api/admin/routes"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newRoute }) });
     setNewRoute(""); loadRoutes();
   };
   const deleteRoute = async id => {
-    await fetch(`/api/admin/routes/${id}`, { method: "DELETE" });
+    await fetch(getApiUrl(`/api/admin/routes/${id}`), { method: "DELETE" });
     setSelectedRoute(null); setStops([]); setBuses([]); setTrips([]); loadRoutes();
   };
 
@@ -252,7 +253,7 @@ export default function AdminPanel() {
       alert("Offset minutes is required — arrival/departure times are calculated from this value when a trip is created.");
       return;
     }
-    await fetch(`/api/admin/routes/${selectedRoute}/stops`, {
+    await fetch(getApiUrl(`/api/admin/routes/${selectedRoute}/stops`), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: stopForm.name,
@@ -268,7 +269,7 @@ export default function AdminPanel() {
   };
 
   const updateStop = async () => {
-    await fetch(`/api/admin/stops/${editingStop}`, {
+    await fetch(getApiUrl(`/api/admin/stops/${editingStop}`), {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...stopForm,
@@ -284,31 +285,31 @@ export default function AdminPanel() {
     loadStops(selectedRoute);
   };
 
-  const deleteStop = async id => { await fetch(`/api/admin/stops/${id}`, { method: "DELETE" }); loadStops(selectedRoute); };
+  const deleteStop = async id => { await fetch(getApiUrl(`/api/admin/stops/${id}`), { method: "DELETE" }); loadStops(selectedRoute); };
 
   // ── Drivers ──
   const addDriver = async () => {
     if (!driverForm.name.trim()) return;
-    await fetch("/api/admin/drivers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(driverForm) });
+    await fetch(getApiUrl("/api/admin/drivers"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(driverForm) });
     setDriverForm({ name: "", phone: "" }); loadDrivers();
   };
-  const deleteDriver = async id => { await fetch(`/api/admin/drivers/${id}`, { method: "DELETE" }); loadDrivers(); };
+  const deleteDriver = async id => { await fetch(getApiUrl(`/api/admin/drivers/${id}`), { method: "DELETE" }); loadDrivers(); };
 
   // ── Buses ──
   const addBus = async () => {
     if (!selectedRoute || !busForm.code || !busForm.plate || !busForm.driver.id) { alert("Fill all fields and select a route."); return; }
-    await fetch(`/api/admin/routes/${selectedRoute}/buses`, {
+    await fetch(getApiUrl(`/api/admin/routes/${selectedRoute}/buses`), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code: busForm.code, plate: busForm.plate, driver: { id: Number(busForm.driver.id) } }),
     });
     setBusForm({ code: "", plate: "", driver: { id: "" } }); loadBuses(selectedRoute);
   };
-  const deleteBus = async id => { await fetch(`/api/admin/buses/${id}`, { method: "DELETE" }); loadBuses(selectedRoute); };
+  const deleteBus = async id => { await fetch(getApiUrl(`/api/admin/buses/${id}`), { method: "DELETE" }); loadBuses(selectedRoute); };
 
   // ── Trips ──
   const addTrip = async () => {
     if (!selectedRoute || !tripForm.busId || !tripForm.departureTime) { alert("Please select both bus and departure time."); return; }
-    const res = await fetch(`/api/admin/routes/${selectedRoute}/trips`, {
+    const res = await fetch(getApiUrl(`/api/admin/routes/${selectedRoute}/trips`), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ busId: Number(tripForm.busId), departureTime: tripForm.departureTime }),
     });
@@ -322,7 +323,7 @@ export default function AdminPanel() {
     if (!selectedRoute || !bulkTripForm.busId || !bulkTripForm.startDate || !bulkTripForm.endDate || !bulkTripForm.time) { 
       alert("Please fill all fields for bulk add."); return; 
     }
-    const res = await fetch(`/api/admin/routes/${selectedRoute}/trips/bulk`, {
+    const res = await fetch(getApiUrl(`/api/admin/routes/${selectedRoute}/trips/bulk`), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         busId: Number(bulkTripForm.busId),
@@ -337,13 +338,13 @@ export default function AdminPanel() {
     alert(`Success: ${data.message} | ${data.stopTimesCreated} stop times generated total.`);
     setBulkTripForm({ busId: "", startDate: "", endDate: "", time: "", gapDays: "1" }); loadTrips(selectedRoute);
   };
-  const deleteTrip = async id => { await fetch(`/api/admin/trips/${id}`, { method: "DELETE" }); loadTrips(selectedRoute); };
+  const deleteTrip = async id => { await fetch(getApiUrl(`/api/admin/trips/${id}`), { method: "DELETE" }); loadTrips(selectedRoute); };
 
   // ── Bus State ──
   const saveBusState = async () => {
     if (!bsForm.busId || !bsForm.lat || !bsForm.lng) { alert("Bus ID, lat aur lng required hai."); return; }
     if (!bsForm.tripId) { alert("Please select a trip — bus state must be trip-specific."); return; }
-    const res = await fetch("/api/admin/bus-state", {
+    const res = await fetch(getApiUrl("/api/admin/bus-state"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         busId: Number(bsForm.busId),
@@ -364,7 +365,7 @@ export default function AdminPanel() {
   const loadTripsForBus = async (busId) => {
     if (!busId) { setTripsForBus([]); return; }
     try {
-      const data = await fetch(`/api/admin/buses/${busId}/trips`).then(r => r.json());
+      const data = await fetch(getApiUrl(`/api/admin/buses/${busId}/trips`)).then(r => r.json());
       setTripsForBus(Array.isArray(data) ? data : []);
     } catch { setTripsForBus([]); }
   };

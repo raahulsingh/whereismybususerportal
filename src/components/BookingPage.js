@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getApiUrl } from '../apiConfig';
 
 // ── Helpers ──────────────────────────────────────────────────────
 function fmt(t) {
@@ -85,7 +86,7 @@ function SearchSection({ onResults }) {
 
   // Load all stop names for dropdown
   useEffect(() => {
-    fetch('/api/stops')
+    fetch(getApiUrl('/api/stops'))
       .then(r => r.json())
       .then(d => {
         const names = [...new Set((Array.isArray(d) ? d : []).map(s => s.name).filter(Boolean))];
@@ -98,7 +99,7 @@ function SearchSection({ onResults }) {
     if (!form.from || !form.to || !form.date) { setError('Please fill in all fields.'); return; }
     setLoading(true); setError('');
     try {
-      const res = await fetch('/api/booking/search', {
+      const res = await fetch(getApiUrl('/api/booking/search'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fromStop: form.from, toStop: form.to, date: form.date }),
@@ -253,7 +254,7 @@ function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
   };
 
   useEffect(() => {
-    fetch(`/api/booking/trips/${trip.tripId}/seats?date=${encodeURIComponent(searchInfo.date || '')}&fromStop=${encodeURIComponent(searchInfo.from || '')}&toStop=${encodeURIComponent(searchInfo.to || '')}`)
+    fetch(getApiUrl(`/api/booking/trips/${trip.tripId}/seats?date=${encodeURIComponent(searchInfo.date || '')}&fromStop=${encodeURIComponent(searchInfo.from || '')}&toStop=${encodeURIComponent(searchInfo.to || '')}`))
       .then(r => { if (!r.ok) throw new Error('API error ' + r.status); return r.json(); })
       .then(d => {
         if (d.layoutJson) {
@@ -559,7 +560,7 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
     setError('');
     try {
       // Step 1: Create Razorpay order on backend
-      const orderRes = await fetch('/api/payment/create-order', {
+      const orderRes = await fetch(getApiUrl('/api/payment/create-order'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -578,7 +579,7 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
       // Step 2: Open Razorpay Checkout
       const options = {
         key: orderData.keyId,
-        amount: orderData.amount,
+        amount: orderData.amount, // Razorpay amount is in Paise
         currency: orderData.currency,
         name: 'Where is my Bus',
         description: `${seats.length} Seat${seats.length > 1 ? 's' : ''} — ${searchInfo.from} \u2192 ${searchInfo.to}`,
@@ -597,11 +598,13 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
         theme: {
           color: '#e65100',
         },
-        handler: async function (response) {
+        send_sms_hash: true,
+        // IMPORTANT: Use arrow function for better 'this' binding in Android
+        handler: async (response) => {
           // Step 3: Verify payment on backend
           setPaymentStage('processing');
           try {
-            const verifyRes = await fetch('/api/payment/verify', {
+            const verifyRes = await fetch(getApiUrl('/api/payment/verify'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -626,11 +629,32 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
           }
         },
         modal: {
-          ondismiss: function () {
+          ondismiss: () => {
             setLoading(false);
             setPaymentStage('summary');
           },
+          // Force it to open in a more compatible way for WebView
+          backdropclose: false,
+          escape: false,
+          handleback: true
         },
+        retry: {
+          enabled: true,
+          max_count: 3
+        },
+        // Razorpay internal config for mobile performance
+        config: {
+          display: {
+            blocks: {
+              utib: {
+                name: 'Pay using UPI',
+                instruments: [{ method: 'upi' }]
+              }
+            },
+            sequence: ['block.utib', 'card', 'netbanking'],
+            preferences: { show_default_blocks: true }
+          }
+        }
       };
 
       const rzp = new window.Razorpay(options);
@@ -639,9 +663,9 @@ function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, on
         setError(response.error?.description || 'Payment failed. Please try again.');
       });
       rzp.open();
-      setLoading(false);
     } catch (err) {
-      setError('Could not initiate payment. Please try again.');
+      console.error('Payment Error:', err);
+      setError('An error occurred while initiating payment.');
       setLoading(false);
     }
   };
@@ -1154,7 +1178,7 @@ export default function BookingPage({ user, onRequestLogin }) {
     const refs = [];
     try {
       for (const p of paymentPassengers) {
-        const res = await fetch('/api/booking/book', {
+        const res = await fetch(getApiUrl('/api/booking/book'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

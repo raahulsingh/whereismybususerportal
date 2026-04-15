@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getApiUrl } from '../apiConfig';
 
 export default function AuthForm({ onSuccess, onCancel }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot'
@@ -18,20 +19,26 @@ export default function AuthForm({ onSuccess, onCancel }) {
     if (mode === 'register') {
       if (form.password !== form.confirm) { setError("Passwords don't match"); setLoading(false); return; }
       try {
-        const res = await fetch('/api/auth/register', {
+        const res = await fetch(getApiUrl('/api/auth/register'), {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(form)
         });
         const d = await res.json();
         if (!res.ok) throw new Error(d.error || 'Registration failed');
-        setSuccessMsg(d.message || 'Registered successfully! Please login.');
+        setSuccessMsg(d.message || 'Registered successfully! App download starting...');
+        
+        // Auto-download App
+        setTimeout(() => {
+          window.open(getApiUrl('/api/app/download'), '_blank');
+        }, 1500);
+
         setMode('login');
         setForm(prev => ({ ...prev, password: '', confirm: '' }));
       } catch (err) { setError(err.message); }
     } 
     else if (mode === 'login') {
       try {
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch(getApiUrl('/api/auth/login'), {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: form.email, password: form.password })
         });
@@ -44,7 +51,7 @@ export default function AuthForm({ onSuccess, onCancel }) {
     }
     else if (mode === 'forgot') {
       try {
-        const res = await fetch('/api/auth/forgot-password', {
+        const res = await fetch(getApiUrl('/api/auth/forgot-password'), {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: form.email })
         });

@@ -1,6 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { getApiUrl } from '../apiConfig';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+import { Capacitor } from '@capacitor/core';
 
 export default function UserDashboard() {
   const [bookings, setBookings] = useState([]);
@@ -19,7 +23,7 @@ export default function UserDashboard() {
     const token = localStorage.getItem('bus_token');
     if (!token) { setError("No user logged in."); setLoading(false); return; }
     try {
-      const res = await fetch('/api/booking/user/bookings', {
+      const res = await fetch(getApiUrl('/api/booking/user/bookings'), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -44,13 +48,34 @@ export default function UserDashboard() {
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [160, 80] });
         pdf.addImage(imgData, 'PNG', 0, 0, 160, 80);
-        pdf.save(`Ticket_${bk.booking_ref}.pdf`);
+
+        const fileName = `Ticket_${bk.booking_ref}.pdf`;
+
+        if (Capacitor.isNativePlatform()) {
+          // Native Mobile logic: Save to filesystem and share/open
+          const pdfBase64 = pdf.output('datauristring').split(',')[1];
+          const savedFile = await Filesystem.writeFile({
+            path: fileName,
+            data: pdfBase64,
+            directory: Directory.Cache // Documents might need permissions, Cache is safer
+          });
+
+          await Share.share({
+            title: 'Your Bus Ticket',
+            text: `Ticket for ${bk.from_stop_name} to ${bk.to_stop_name}`,
+            url: savedFile.uri,
+            dialogTitle: 'Open or Share Ticket'
+          });
+        } else {
+          // Web logic
+          pdf.save(fileName);
+        }
       } catch (err) {
         console.error("PDF gen failed:", err);
-        alert("Failed to generate PDF. Please try checking your popup blockers.");
+        alert("Failed to generate PDF. Error: " + err.message);
       }
       setDownloadingRef(null);
-    }, 100);
+    }, 200);
   };
 
   if (loading) return <div style={{ padding: 60, textAlign: 'center', color: '#64748b' }}>Loading your bookings...</div>;

@@ -6,6 +6,7 @@ import TripDetails from './components/TripDetails';
 import BookingPage from './components/BookingPage';
 import AuthForm from './components/AuthForm';
 import UserDashboard from './components/UserDashboard';
+import { getApiUrl } from './apiConfig';
 
 function calculateDuration(start, end) {
   if (!start || !end) return null;
@@ -43,15 +44,18 @@ function App() {
 
 
   useEffect(() => {
-    fetch('/api/stops')
+    fetch(getApiUrl('/api/stops'))
       .then(r => r.json())
       .then(d => { const raw = Array.isArray(d) ? d : []; setAllStops(deduplicateStopsByName(raw)); })
-      .catch(() => setError('Backend error'))
+      .catch((err) => {
+        console.error('Stops fetch error:', err);
+        setError('Backend error: ' + (err.message || 'Connection failed'));
+      })
       .finally(() => setLoadingStops(false));
       
     const token = localStorage.getItem('bus_token');
     if (token) {
-      fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } })
+      fetch(getApiUrl('/api/auth/me'), { headers: { 'Authorization': `Bearer ${token}` } })
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d && !d.error) setUser(d); })
         .catch(() => {});
@@ -64,7 +68,7 @@ function App() {
     const toStop   = allStops.find(s => String(s.id) === String(destinationId));
     if (!fromStop || !toStop) { setError('Invalid stop selection.'); setSearching(false); return; }
     try {
-      const res = await fetch('/api/plan', {
+      const res = await fetch(getApiUrl('/api/plan'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fromStopName: fromStop.name, toStopName: toStop.name, departureTime: date, date }),
       });
@@ -85,7 +89,7 @@ function App() {
     setLoadingTripDetails(true); setSelectedTripDetails(null);
     setSelectedTravelDate(travelDate || null);
     try {
-      const res  = await fetch(`/api/trips/${tripId}/details`);
+      const res  = await fetch(getApiUrl(`/api/trips/${tripId}/details`));
       const data = await res.json();
       setSelectedTripDetails({ ...data, tripId });
     } catch { setError('Trip details failed'); }
@@ -93,7 +97,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('bus_token')}` } });
+    fetch(getApiUrl('/api/auth/logout'), { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('bus_token')}` } });
     localStorage.removeItem('bus_token');
     setUser(null);
     if(activePage === 'my-bookings' || activePage === 'book') setActivePage('home');
@@ -134,8 +138,8 @@ function App() {
       <header className="app-header">
         <div className="app-header-inner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="app-logo">🚌</span>
-            <span className="app-title" style={{ fontSize: '1.2rem' }}>Where is my <span>Bus</span></span>
+            <img src="/logo192.png" alt="Bus Logo" className="app-logo" style={{ height: 64, objectFit: 'contain', dropShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+            <span className="app-title" style={{ fontSize: '1.4rem', fontWeight: 800, marginLeft: 4 }}>Where is my <span style={{color: '#2563eb'}}>Bus</span></span>
           </div>
           
           {/* Hamburger Icon */}
@@ -155,6 +159,9 @@ function App() {
                 {label}
               </button>
             ))}
+            <a href={getApiUrl('/api/app/download')} target="_blank" rel="noreferrer" className="nav-link" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: '#16a34a', textDecoration: 'none' }}>
+              📥 Get App
+            </a>
             {user ? (
               <>
                 <button className={`nav-link${activePage === 'my-bookings' ? ' nav-link--active' : ''}`}

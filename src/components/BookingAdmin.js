@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getApiUrl } from '../apiConfig';
 
 function LoginGate({ onLogin }) {
   const [pw, setPw] = useState('');
@@ -9,7 +10,7 @@ function LoginGate({ onLogin }) {
     if (!pw.trim()) return;
     setLoading(true); setErr('');
     try {
-      const res = await fetch('/api/booking/admin/login', {
+      const res = await fetch(getApiUrl('/api/booking/admin/login'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw }),
       });
@@ -92,7 +93,7 @@ export default function BookingAdmin() {
   const loadBookings = async (date) => {
     setLoadingB(true);
     const d = date !== undefined ? date : dateFilter;
-    const url = d ? `/api/booking/admin/bookings?date=${d}` : '/api/booking/admin/bookings';
+    const url = d ? getApiUrl(`/api/booking/admin/bookings?date=${d}`) : getApiUrl('/api/booking/admin/bookings');
     try {
       const data = await fetch(url).then(r => r.json());
       setBookings(Array.isArray(data) ? data : []);
@@ -101,7 +102,7 @@ export default function BookingAdmin() {
   };
 
   const loadPricing = async () => {
-    const data = await fetch('/api/booking/admin/pricing').then(r => r.json());
+    const data = await fetch(getApiUrl('/api/booking/admin/pricing')).then(r => r.json());
     setPricing(Array.isArray(data) ? data : []);
   };
 
@@ -109,14 +110,14 @@ export default function BookingAdmin() {
 
   const cancelBooking = async (id) => {
     if (!window.confirm('Cancel this booking?')) return;
-    await fetch(`/api/booking/admin/bookings/${id}/cancel`, { method: 'PUT' });
+    await fetch(getApiUrl(`/api/booking/admin/bookings/${id}/cancel`), { method: 'PUT' });
     loadBookings();
   };
 
   const savePrice = async (routeId) => {
     const price = editPrice[routeId];
     if (!price) return;
-    await fetch(`/api/booking/admin/pricing/${routeId}`, {
+    await fetch(getApiUrl(`/api/booking/admin/pricing/${routeId}`), {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ price: Number(price) }),
     });
@@ -126,7 +127,7 @@ export default function BookingAdmin() {
 
   const changePassword = async () => {
     if (pwForm.newPassword !== pwForm.confirm) { setPwMsg('❌ New passwords do not match'); return; }
-    const res = await fetch('/api/booking/admin/password', {
+    const res = await fetch(getApiUrl('/api/booking/admin/password'), {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ current: pwForm.current, newPassword: pwForm.newPassword }),
     });
