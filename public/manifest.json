@@ -1,28 +1,27 @@
 {
-  "short_name": "My Bus",
-  "name": "Where is my Bus",
-  "description": "Book bus tickets instantly and track your journey.",
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "whereismybus",
+  "orientation": "portrait",
+  "scope": "/",
+  "short_name": "where-is-my-bus.vercel",
+  "start_url": "/",
+  "theme_color": "#ffffff",
   "icons": [
     {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "logo192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo512.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
+      "src": "https://where-is-my-bus.vercel.app/vite.svg",
+      "type": "image/svg+xml",
+      "isSquare": false,
+      "isPng": false,
+      "isWebp": false,
+      "isJpg": false,
+      "width": 0,
+      "is512x512": false,
+      "is256x256": false,
+      "is192x192": false
     }
   ],
-  "start_url": "/",
-  "display": "standalone",
-  "theme_color": "#2563eb",
-  "background_color": "#ffffff"
+  "description": "Book bus tickets instantly and track your journey",
+  "lang": "en"
 }
