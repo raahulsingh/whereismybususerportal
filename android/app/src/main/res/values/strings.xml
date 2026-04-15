@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">whereismybus</string>
+    <string name="title_activity_main">whereismybus</string>
+    <string name="package_name">com.example.whereismybus</string>
+    <string name="custom_url_scheme">com.example.whereismybus</string>
+</resources>
