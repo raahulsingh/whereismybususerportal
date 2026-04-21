@@ -742,7 +742,7 @@
 
 @media (max-width: 600px) {
   .app-header {
-    height: 70px;
+    height: 90px;
     padding: 0 16px;
   }
   .app-header-inner {
@@ -751,16 +751,16 @@
   .app-logo-group {
     flex: 1;
     justify-content: center;
-    margin-right: -40px; /* Offset to counter the hamburger width and actually center the logo */
+    margin-right: -40px;
   }
   .app-logo-img {
-    height: 38px;
+    height: 64px;
   }
   .app-title {
-    font-size: 1.1rem;
+    font-size: 1.25rem;
   }
   .app-main { padding: 16px 12px 48px; }
-  .app-nav { gap: 2px; }
+  .app-nav { gap: 2px; top: 90px; }
   .nav-link { font-size: 12px; padding: 5px 8px; }
   .search-card { padding: 16px; }
   .search-row { flex-direction: column; overflow: visible; }
