@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { getApiUrl } from '../apiConfig';
 import BusList from './BusList';
 import SearchSection from './SearchSection';
@@ -9,7 +10,10 @@ import BookingConfirmed from './BookingConfirmed';
 
 // ── Main BookingPage ─────────────────────────────────────────────
 export default function BookingPage({ user, onRequestLogin }) {
-  const [stage, setStage] = useState('search');  // search | results | seats | payment | confirmed
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Stages: search | results | seats | payment | confirmed
   const [results, setResults] = useState([]);
   const [searchInfo, setSearchInfo] = useState({});
   const [selectedTrip, setSelectedTrip] = useState(null);
@@ -20,7 +24,11 @@ export default function BookingPage({ user, onRequestLogin }) {
   const [paymentPassengers, setPaymentPassengers] = useState([]);
   const [bookingError, setBookingError] = useState('');
 
-  if (!user && (stage === 'search' || stage === 'results' || stage === 'seats')) {
+  // Determine protection based on path
+  const currentPath = location.pathname.split('/').pop() || 'search';
+  const isProtected = ['search', 'results', 'seats'].includes(currentPath);
+
+  if (!user && isProtected) {
     return (
       <div style={{ padding: '80px 20px', textAlign: 'center' }}>
         <div style={{ fontSize: 60, marginBottom: 20 }}>🔐</div>
@@ -34,21 +42,21 @@ export default function BookingPage({ user, onRequestLogin }) {
   }
 
   const handleResults = (data, info) => {
-    setResults(data); setSearchInfo(info); setStage('results');
+    setResults(data); setSearchInfo(info); navigate('/book/results');
   };
 
   const handleSelect = (trip) => {
-    setSelectedTrip(trip); setStage('seats');
+    setSelectedTrip(trip); navigate('/book/seats');
   };
 
   // Called from SeatLayout after passenger validation
   const handleGoToPayment = (seats, passengers) => {
     setPaymentSeats(seats);
     setPaymentPassengers(passengers);
-    setStage('payment');
+    navigate('/book/payment');
   };
 
-  // Called after payment succeeds \u2014 now actually book via API
+  // Called after payment succeeds — now actually book via API
   const handlePaymentSuccess = async () => {
     setBookingError('');
     const refs = [];
@@ -75,7 +83,7 @@ export default function BookingPage({ user, onRequestLogin }) {
         const data = await res.json();
         if (data.error) {
           setBookingError(`Seat ${p.seatNo}: ${data.error}`);
-          setStage('seats');
+          navigate('/book/seats');
           return;
         }
         refs.push(data.bookingRef);
@@ -83,10 +91,10 @@ export default function BookingPage({ user, onRequestLogin }) {
       setConfirmedData({ bookingRefs: refs, count: paymentPassengers.length, trip: selectedTrip });
       setConfirmedSeats(paymentSeats);
       setConfirmedPassengers(paymentPassengers);
-      setStage('confirmed');
+      navigate('/book/confirmed');
     } catch {
       setBookingError('Booking failed after payment. Contact support.');
-      setStage('seats');
+      navigate('/book/seats');
     }
   };
 
@@ -94,16 +102,16 @@ export default function BookingPage({ user, onRequestLogin }) {
     setConfirmedData({ ...data, trip });
     setConfirmedSeats(seats);
     setConfirmedPassengers(passengers);
-    setStage('confirmed');
+    navigate('/book/confirmed');
   };
 
   const handleBookMore = () => {
-    setStage('seats');
+    navigate('/book/seats');
     setConfirmedData(null); setConfirmedSeats([]); setConfirmedPassengers([]);
   };
 
   const reset = () => {
-    setStage('search'); setResults([]); setSelectedTrip(null);
+    navigate('/book/search'); setResults([]); setSelectedTrip(null);
     setConfirmedData(null); setConfirmedSeats([]); setConfirmedPassengers([]);
     setPaymentSeats([]); setPaymentPassengers([]); setBookingError('');
   };
@@ -112,8 +120,8 @@ export default function BookingPage({ user, onRequestLogin }) {
     <div style={{ padding: '32px 16px', minHeight: '80vh', background: '#f8fafc' }}>
 
       {/* Back navigation */}
-      {stage !== 'search' && stage !== 'confirmed' && stage !== 'payment' && (
-        <button onClick={() => setStage(stage === 'seats' ? 'results' : 'search')}
+      {!['search', 'confirmed', 'payment'].includes(currentPath) && (
+        <button onClick={() => navigate(currentPath === 'seats' ? '/book/results' : '/book/search')}
           style={{
             background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb',
             fontWeight: 600, fontSize: 14, marginBottom: 16, display: 'block'
@@ -138,38 +146,41 @@ export default function BookingPage({ user, onRequestLogin }) {
         </div>
       )}
 
-      {stage === 'search' && <SearchSection onResults={handleResults} />}
-      {stage === 'results' && <BusList results={results} searchInfo={searchInfo} onSelect={handleSelect} />}
-      {stage === 'seats' && (
-        <SeatLayout
-          trip={selectedTrip}
-          searchInfo={searchInfo}
-          user={user}
-          onSeatBooked={handleBooked}
-          onGoToPayment={handleGoToPayment}
-        />
-      )}
-      {stage === 'payment' && (
-        <PaymentPage
-          trip={selectedTrip}
-          searchInfo={searchInfo}
-          seats={paymentSeats}
-          passengers={paymentPassengers}
-          onPaymentSuccess={handlePaymentSuccess}
-          onBack={() => setStage('seats')}
-        />
-      )}
-      {stage === 'confirmed' && (
-        <BookingConfirmed
-          bookingData={confirmedData}
-          trip={selectedTrip}
-          seats={confirmedSeats}
-          passengers={confirmedPassengers}
-          onDone={reset}
-          onBookMore={handleBookMore}
-          searchInfo={searchInfo}
-        />
-      )}
+      <Routes>
+        <Route path="/" element={<Navigate to="search" replace />} />
+        <Route path="search" element={<SearchSection onResults={handleResults} searchInfo={searchInfo} />} />
+        <Route path="results" element={<BusList results={results} searchInfo={searchInfo} onSelect={handleSelect} />} />
+        <Route path="seats" element={
+          <SeatLayout
+            trip={selectedTrip}
+            searchInfo={searchInfo}
+            user={user}
+            onSeatBooked={handleBooked}
+            onGoToPayment={handleGoToPayment}
+          />
+        } />
+        <Route path="payment" element={
+          <PaymentPage
+            trip={selectedTrip}
+            searchInfo={searchInfo}
+            seats={paymentSeats}
+            passengers={paymentPassengers}
+            onPaymentSuccess={handlePaymentSuccess}
+            onBack={() => navigate('/book/seats')}
+          />
+        } />
+        <Route path="confirmed" element={
+          <BookingConfirmed
+            bookingData={confirmedData}
+            trip={selectedTrip}
+            seats={confirmedSeats}
+            passengers={confirmedPassengers}
+            onDone={reset}
+            onBookMore={handleBookMore}
+            searchInfo={searchInfo}
+          />
+        } />
+      </Routes>
     </div>
   );
 }

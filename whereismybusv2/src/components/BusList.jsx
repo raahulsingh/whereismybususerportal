@@ -1,17 +1,35 @@
-import { fmtDate , fmt, duration} from "../utils/bookingUtils";
+import { fmtDate, fmt, duration } from "../utils/bookingUtils";
 // ── Step 2: Bus Results ──────────────────────────────────────────
 
 
 export default function BusList({ results, searchInfo, onSelect }) {
-  if (!results || results.length === 0)
-    return <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 16 }}>😔 No buses found on this route.</div>;
+  // ── Frontend cutoff logic (IST) ──
+  const nowStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  const now = new Date(nowStr);
+
+  const filteredResults = (results || []).filter(bus => {
+    if (!bus.tripStartTime) return true; // Safety fallback
+    const tripStart = new Date(bus.tripStartTime.replace(' ', 'T'));
+    // Cutoff = tripStart - 5 minutes
+    const cutoff = new Date(tripStart.getTime() - (5 * 60 * 1000));
+    return now < cutoff;
+  });
+
+  if (!filteredResults || filteredResults.length === 0) {
+    const isFiltered = results && results.length > 0;
+    return (
+      <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 16 }}>
+        {isFiltered ? "🕒 Booking closed for all buses on this route today." : "😔 No buses found on this route."}
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 700, margin: '24px auto' }}>
       <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12 }}>
-        <strong>{results.length} buses</strong> found — {searchInfo.from} → {searchInfo.to} · {fmtDate(searchInfo.date)}
+        <strong>{filteredResults.length} buses</strong> found — {searchInfo.from} → {searchInfo.to} · {searchInfo.date ? fmtDate(searchInfo.date) : ''}
       </div>
-      {results.map((bus, i) => {
+      {filteredResults.map((bus, i) => {
         const hasSleeperPrice = bus.sleeperPrice && Number(bus.sleeperPrice) !== Number(bus.price);
         return (
           <div key={i} onClick={() => onSelect(bus)} style={{

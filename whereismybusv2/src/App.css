@@ -744,4 +744,26 @@
     padding: 6px 16px;
     justify-content: flex-start;
   }
+
+  /* ── Mobile Utilities ── */
+  .mobile-col {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  .search-box-container.mobile-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  .mobile-wrap {
+    flex-wrap: wrap !important;
+  }
+  .mobile-w-100 {
+    width: 100% !important;
+  }
+  .search-box-container {
+    padding: 0 !important;
+  }
 }

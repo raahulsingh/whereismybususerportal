@@ -6,8 +6,12 @@ import { todayStr } from '../utils/bookingUtils';
 
 
 
-export default function SearchSection({ onResults }) {
-  const [form, setForm] = useState({ from: '', to: '', date: todayStr() });
+export default function SearchSection({ onResults, searchInfo }) {
+  const [form, setForm] = useState({ 
+    from: searchInfo?.from || '', 
+    to: searchInfo?.to || '', 
+    date: searchInfo?.date || todayStr() 
+  });
   const [allStops, setAllStops] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
