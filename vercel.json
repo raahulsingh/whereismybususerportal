@@ -1,0 +1,6 @@
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "whereismybusv2/dist",
+  "installCommand": "npm install"
+}
