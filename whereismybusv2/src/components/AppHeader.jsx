@@ -23,20 +23,19 @@ export default function AppHeader({ user, onLogout, onShowAuth }) {
 
   return (
     <header className="app-header">
-      <div
-        className="app-header-inner"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}
-      >
+      <div className="app-header-inner">
+        {/* Placeholder to help center the logo group with flexbox/grid if needed */}
+        <div className="header-left-space mobile-show" style={{ width: 40 }} />
+
         {/* Logo + Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="app-logo-group">
           <img
             src={icon}
             alt="Bus Logo"
-            className="app-logo"
-            style={{ height: 64, objectFit: 'contain' }}
+            className="app-logo-img"
           />
-          <span className="app-title" style={{ fontSize: '1.4rem', fontWeight: 800, marginLeft: 4 }}>
-            Where is my <span style={{ color: '#2563eb' }}>Bus</span>
+          <span className="app-title">
+            Where is my <span>Bus</span>
           </span>
         </div>
 

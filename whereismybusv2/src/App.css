@@ -24,13 +24,23 @@
   justify-content: space-between;
 }
 
-.app-logo { font-size: 22px; }
+.app-logo-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-logo-img {
+  height: 42px;
+  width: auto;
+  object-fit: contain;
+}
 
 .app-title {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 1.4rem;
+  font-weight: 800;
   color: var(--text);
-  letter-spacing: -.3px;
+  letter-spacing: -.5px;
   white-space: nowrap;
 }
 
@@ -731,6 +741,24 @@
 }
 
 @media (max-width: 600px) {
+  .app-header {
+    height: 70px;
+    padding: 0 16px;
+  }
+  .app-header-inner {
+    justify-content: space-between;
+  }
+  .app-logo-group {
+    flex: 1;
+    justify-content: center;
+    margin-right: -40px; /* Offset to counter the hamburger width and actually center the logo */
+  }
+  .app-logo-img {
+    height: 38px;
+  }
+  .app-title {
+    font-size: 1.1rem;
+  }
   .app-main { padding: 16px 12px 48px; }
   .app-nav { gap: 2px; }
   .nav-link { font-size: 12px; padding: 5px 8px; }
