@@ -4,12 +4,12 @@ services:
   - type: web
     name: where-is-my-bus-frontend
     runtime: static
-    rootDir: my-app
+    rootDir: whereismybusv2
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     buildFilter:
       paths:
-        - "my-app/**"
+        - "whereismybusv2/**"
 
   # 2. Backend (Docker Web Service)
   - type: web

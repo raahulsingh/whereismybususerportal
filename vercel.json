@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build --prefix whereismybusv2",
   "outputDirectory": "whereismybusv2/dist",
-  "installCommand": "npm install"
+  "installCommand": "npm install --prefix whereismybusv2"
 }
