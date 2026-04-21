@@ -24,9 +24,6 @@ export default function AppHeader({ user, onLogout, onShowAuth }) {
   return (
     <header className="app-header">
       <div className="app-header-inner">
-        {/* Placeholder to help center the logo group with flexbox/grid if needed */}
-        <div className="header-left-space mobile-show" style={{ width: 40 }} />
-
         {/* Logo + Title */}
         <div className="app-logo-group">
           <img

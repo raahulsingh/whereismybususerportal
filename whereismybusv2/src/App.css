@@ -749,9 +749,9 @@
     justify-content: space-between;
   }
   .app-logo-group {
-    flex: 1;
-    justify-content: center;
-    margin-right: -40px;
+    flex: none;
+    justify-content: flex-start;
+    margin-right: 0;
   }
   .app-logo-img {
     height: 64px;
