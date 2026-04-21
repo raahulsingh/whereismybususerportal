@@ -766,4 +766,50 @@
   .search-box-container {
     padding: 0 !important;
   }
+
+  /* ── Mobile Navigation ── */
+  .mobile-menu-btn {
+    display: block;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text);
+    padding: 8px;
+    z-index: 101;
+  }
+
+  .app-nav {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    background: var(--surface);
+    padding: 16px;
+    box-shadow: var(--shadow-lg);
+    border-bottom: 1px solid var(--border);
+    z-index: 100;
+    gap: 8px;
+  }
+
+  .app-nav.open {
+    display: flex;
+  }
+
+  .nav-link {
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+}
+
+/* Ensure hamburger button is hidden on desktop */
+@media (min-width: 601px) {
+  .mobile-menu-btn {
+    display: none;
+  }
 }
