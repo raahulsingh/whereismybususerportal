@@ -28,11 +28,20 @@ public class User {
     @Column(name = "session_token", unique = true)
     private String sessionToken;
 
+    @Column(name = "session_token_expiry")
+    private LocalDateTime sessionTokenExpiry;
+
     @Column(name = "reset_token", unique = true)
     private String resetToken;
 
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
+
+    @Column(name = "failed_login_attempts", nullable = false)
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "account_locked_until")
+    private LocalDateTime accountLockedUntil;
 
     // Default constructor
     public User() {}
@@ -59,9 +68,27 @@ public class User {
     public String getSessionToken() { return sessionToken; }
     public void setSessionToken(String sessionToken) { this.sessionToken = sessionToken; }
 
+    public LocalDateTime getSessionTokenExpiry() { return sessionTokenExpiry; }
+    public void setSessionTokenExpiry(LocalDateTime sessionTokenExpiry) { this.sessionTokenExpiry = sessionTokenExpiry; }
+
     public String getResetToken() { return resetToken; }
     public void setResetToken(String resetToken) { this.resetToken = resetToken; }
 
     public LocalDateTime getResetTokenExpiry() { return resetTokenExpiry; }
     public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) { this.resetTokenExpiry = resetTokenExpiry; }
+
+    public int getFailedLoginAttempts() { return failedLoginAttempts; }
+    public void setFailedLoginAttempts(int failedLoginAttempts) { this.failedLoginAttempts = failedLoginAttempts; }
+
+    public LocalDateTime getAccountLockedUntil() { return accountLockedUntil; }
+    public void setAccountLockedUntil(LocalDateTime accountLockedUntil) { this.accountLockedUntil = accountLockedUntil; }
+
+    // Helper methods
+    public boolean isAccountLocked() {
+        return accountLockedUntil != null && accountLockedUntil.isAfter(LocalDateTime.now());
+    }
+
+    public boolean isSessionExpired() {
+        return sessionTokenExpiry == null || sessionTokenExpiry.isBefore(LocalDateTime.now());
+    }
 }

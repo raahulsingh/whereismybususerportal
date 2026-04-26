@@ -34,7 +34,7 @@ public class BusLocationController {
 
     // Latest info for one bus
     @GetMapping("/latest/{busId}")
-    public ResponseEntity<?> latest(@PathVariable Long busId) {
+    public ResponseEntity<?> latest(@PathVariable("busId") Long busId) {
         Optional<LiveBusDTO> latestBus = trackingService.getLiveBuses(null).stream()
                 .filter(b -> Objects.equals(b.getBusId(), busId))
                 .findFirst();

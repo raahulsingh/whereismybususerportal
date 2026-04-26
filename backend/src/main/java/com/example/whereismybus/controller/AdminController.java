@@ -1,7 +1,10 @@
 package com.example.whereismybus.controller;
 
+import com.example.whereismybus.config.SecurityFilter;
 import com.example.whereismybus.entity.*;
 import com.example.whereismybus.repo.*;
+import com.example.whereismybus.repository.AgentRepository;
+import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,7 +20,6 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.util.List;
 import java.util.Map;
 
-@CrossOrigin(originPatterns = "*")
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
@@ -27,18 +29,88 @@ public class AdminController {
     private final BusRepo busRepo;
     private final DriverRepo driverRepo;
     private final JdbcTemplate jdbc;
-
-    // Simple hardcoded admin password — move to application.properties for production
-    private static final String ADMIN_PASSWORD = "R@hul@25June";
+    private final SecurityFilter securityFilter;
+    private final AgentRepository agentRepo;
 
     public AdminController(RouteRepo routeRepo, StopRepo stopRepo,
-                           BusRepo busRepo, DriverRepo driverRepo,
-                           JdbcTemplate jdbc) {
+            BusRepo busRepo, DriverRepo driverRepo,
+            JdbcTemplate jdbc, SecurityFilter securityFilter,
+            AgentRepository agentRepo) {
         this.routeRepo = routeRepo;
         this.stopRepo = stopRepo;
         this.busRepo = busRepo;
         this.driverRepo = driverRepo;
         this.jdbc = jdbc;
+        this.securityFilter = securityFilter;
+        this.agentRepo = agentRepo;
+    }
+    // ================= DIAGNOSTICS (TEMP — remove after debugging)
+    // =================
+
+    @GetMapping("/health/agent-tables")
+    public ResponseEntity<?> checkAgentTables() {
+        try {
+            java.util.Map<String, Object> result = new java.util.HashMap<>();
+            // Test full getAgentAssignments logic
+            try {
+                List<Long> routeIds = jdbc.queryForList(
+                        "SELECT route_id FROM agent_route_assignments WHERE agent_id = ?",
+                        Long.class, 3L);
+
+                List<Map<String, Object>> busRows = jdbc.queryForList(
+                        "SELECT b.route_id, aba.bus_id FROM agent_bus_assignments aba JOIN buses b ON b.id = aba.bus_id WHERE aba.agent_id = ?",
+                        3L);
+
+                Map<Long, List<Long>> busesByRoute = new java.util.HashMap<>();
+                for (Map<String, Object> row : busRows) {
+                    Long rId = ((Number) row.get("route_id")).longValue();
+                    Long bId = ((Number) row.get("bus_id")).longValue();
+                    busesByRoute.computeIfAbsent(rId, k -> new java.util.ArrayList<>()).add(bId);
+                }
+
+                Map<String, Object> finalMap = Map.of(
+                        "routes", routeIds,
+                        "buses", busesByRoute);
+                result.put("assignments_test", "OK, map created");
+            } catch (Exception e) {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                e.printStackTrace(new java.io.PrintWriter(sw));
+                result.put("assignments_test_error", sw.toString());
+            }
+
+            // Test assign-bus logic
+            try {
+                Long agentId = 3L;
+                Long busId = 1L;
+                if (agentRepo.findById(agentId).isEmpty()) {
+                    result.put("assign_test", "Agent 3 not found");
+                } else if (busRepo.findById(busId).isEmpty()) {
+                    result.put("assign_test", "Bus 1 not found");
+                } else {
+                    Integer existing = jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM agent_bus_assignments WHERE agent_id = ? AND bus_id = ?",
+                            Integer.class, agentId, busId);
+                    result.put("assign_test", "Logic passed, existing: " + existing);
+                }
+            } catch (Exception e) {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                e.printStackTrace(new java.io.PrintWriter(sw));
+                result.put("assign_test_error", sw.toString());
+            }
+
+            try {
+                Integer totalRoutes = jdbc.queryForObject("SELECT COUNT(*) FROM routes", Integer.class);
+                Integer totalBuses = jdbc.queryForObject("SELECT COUNT(*) FROM buses", Integer.class);
+                result.put("total_routes", totalRoutes);
+                result.put("total_buses", totalBuses);
+            } catch (Exception e) {
+                result.put("routes_buses_error", e.getMessage());
+            }
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
     }
 
     // ================= AUTH =================
@@ -46,11 +118,17 @@ public class AdminController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
         String pw = body.getOrDefault("password", "");
-        if (ADMIN_PASSWORD.equals(pw)) {
-            return ResponseEntity.ok(Map.of("success", true));
+        try {
+            String storedHash = jdbc.queryForObject(
+                    "SELECT password FROM admin_credentials WHERE role = 'admin'", String.class);
+            if (storedHash != null && BCrypt.checkpw(pw, storedHash)) {
+                String token = securityFilter.generateAdminToken("admin");
+                return ResponseEntity.ok(Map.of("success", true, "adminToken", token));
+            }
+        } catch (Exception ignored) {
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "Wrong password"));
+                .body(Map.of("error", "Invalid credentials"));
     }
 
     // ================= ROUTES =================
@@ -70,7 +148,8 @@ public class AdminController {
     public ResponseEntity<?> deleteRoute(@PathVariable("id") Long id) {
         try {
             // 1) Delete bus_state entries referencing this route (via route_id or bus_id)
-            //    First nullify active_trip_id to avoid FK issues, then delete bus_state rows for buses on this route
+            // First nullify active_trip_id to avoid FK issues, then delete bus_state rows
+            // for buses on this route
             jdbc.update("UPDATE bus_state SET active_trip_id = NULL WHERE route_id = ?", id);
             jdbc.update("DELETE FROM bus_state WHERE route_id = ?", id);
 
@@ -107,10 +186,11 @@ public class AdminController {
             // 12) Finally delete the route itself
             routeRepo.deleteById(id);
 
-            return ResponseEntity.ok(Map.of("deleted", id, "message", "Route and all related data deleted successfully"));
+            return ResponseEntity
+                    .ok(Map.of("deleted", id, "message", "Route and all related data deleted successfully"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Failed to delete route. Please try again."));
         }
     }
 
@@ -118,7 +198,8 @@ public class AdminController {
 
     /**
      * GET /api/admin/routes/{id}/stops
-     * ✅ UPDATED: Also returns offsetMin from route_stops table so frontend can display it.
+     * ✅ UPDATED: Also returns offsetMin from route_stops table so frontend can
+     * display it.
      */
     @GetMapping("/routes/{id}/stops")
     public List<Map<String, Object>> getStops(@PathVariable("id") Long id) {
@@ -141,7 +222,8 @@ public class AdminController {
      * relative to the trip's departure time. Used to auto-generate stop_times
      * when a trip is created.
      *
-     * Body: { "name": "Roorkee", "lat": 29.86, "lng": 77.89, "seq": 3, "offsetMin": 60 }
+     * Body: { "name": "Roorkee", "lat": 29.86, "lng": 77.89, "seq": 3, "offsetMin":
+     * 60 }
      */
     @PostMapping("/routes/{id}/stops")
     public ResponseEntity<?> addStop(@PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
@@ -153,8 +235,8 @@ public class AdminController {
             Stop s = new Stop();
             s.setRoute(route);
             s.setName(body.get("name").toString());
-            s.setLat(BigDecimal.valueOf(Double.parseDouble(body.get("lat").toString())));   // ✅ FIXED
-            s.setLng(BigDecimal.valueOf(Double.parseDouble(body.get("lng").toString())));   // ✅ FIXED
+            s.setLat(BigDecimal.valueOf(Double.parseDouble(body.get("lat").toString()))); // ✅ FIXED
+            s.setLng(BigDecimal.valueOf(Double.parseDouble(body.get("lng").toString()))); // ✅ FIXED
             s.setSeq(Integer.parseInt(body.get("seq").toString()));
             Stop saved = stopRepo.save(s);
 
@@ -171,18 +253,17 @@ public class AdminController {
 
             jdbc.update(
                     """
-                    INSERT INTO route_stops (route_id, stop_id, seq, offset_min, price_offset, sleeper_price_offset)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE offset_min = VALUES(offset_min), stop_id = VALUES(stop_id),
-                        price_offset = VALUES(price_offset), sleeper_price_offset = VALUES(sleeper_price_offset)
-                    """,
-                    id, saved.getId(), saved.getSeq(), offsetMin, priceOffset, sleeperPriceOffset
-            );
+                            INSERT INTO route_stops (route_id, stop_id, seq, offset_min, price_offset, sleeper_price_offset)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE offset_min = VALUES(offset_min), stop_id = VALUES(stop_id),
+                                price_offset = VALUES(price_offset), sleeper_price_offset = VALUES(sleeper_price_offset)
+                            """,
+                    id, saved.getId(), saved.getSeq(), offsetMin, priceOffset, sleeperPriceOffset);
 
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Operation failed. Please try again."));
         }
     }
 
@@ -192,13 +273,13 @@ public class AdminController {
      */
     @PutMapping("/stops/{stopId}")
     public ResponseEntity<?> updateStop(@PathVariable("stopId") Long stopId,
-                                        @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body) {
         try {
             Stop s = stopRepo.findById(stopId)
                     .orElseThrow(() -> new RuntimeException("Stop not found"));
             s.setName(body.get("name").toString());
-            s.setLat(BigDecimal.valueOf(Double.parseDouble(body.get("lat").toString())));   // ✅ FIXED
-            s.setLng(BigDecimal.valueOf(Double.parseDouble(body.get("lng").toString())));   // ✅ FIXED
+            s.setLat(BigDecimal.valueOf(Double.parseDouble(body.get("lat").toString()))); // ✅ FIXED
+            s.setLng(BigDecimal.valueOf(Double.parseDouble(body.get("lng").toString()))); // ✅ FIXED
             s.setSeq(Integer.parseInt(body.get("seq").toString()));
             Stop saved = stopRepo.save(s);
 
@@ -207,26 +288,26 @@ public class AdminController {
                 int offsetMin = Integer.parseInt(body.get("offsetMin").toString());
                 if (body.containsKey("priceOffset") || body.containsKey("sleeperPriceOffset")) {
                     int priceOffset = body.containsKey("priceOffset")
-                            ? Integer.parseInt(body.get("priceOffset").toString()) : 0;
+                            ? Integer.parseInt(body.get("priceOffset").toString())
+                            : 0;
                     int sleeperPriceOffset = body.containsKey("sleeperPriceOffset")
-                            ? Integer.parseInt(body.get("sleeperPriceOffset").toString()) : 0;
+                            ? Integer.parseInt(body.get("sleeperPriceOffset").toString())
+                            : 0;
                     jdbc.update(
                             "UPDATE route_stops SET offset_min = ?, seq = ?, price_offset = ?, sleeper_price_offset = ? WHERE stop_id = ?",
-                            offsetMin, saved.getSeq(), priceOffset, sleeperPriceOffset, stopId
-                    );
+                            offsetMin, saved.getSeq(), priceOffset, sleeperPriceOffset, stopId);
                 } else {
                     // Update offset and seq but preserve existing pricing
                     jdbc.update(
                             "UPDATE route_stops SET offset_min = ?, seq = ? WHERE stop_id = ?",
-                            offsetMin, saved.getSeq(), stopId
-                    );
+                            offsetMin, saved.getSeq(), stopId);
                 }
             }
 
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Operation failed. Please try again."));
         }
     }
 
@@ -249,7 +330,7 @@ public class AdminController {
             return ResponseEntity.ok(Map.of("deleted", stopId));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Operation failed. Please try again."));
         }
     }
 
@@ -275,7 +356,7 @@ public class AdminController {
             return ResponseEntity.ok(Map.of("deleted", id));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Operation failed. Please try again."));
         }
     }
 
@@ -288,7 +369,7 @@ public class AdminController {
 
     @PostMapping("/routes/{routeId}/buses")
     public Bus addBus(@PathVariable("routeId") Long routeId,
-                      @RequestBody Bus bus) {
+            @RequestBody Bus bus) {
         Route route = routeRepo.findById(routeId)
                 .orElseThrow(() -> new RuntimeException("Route not found"));
         Driver driver = driverRepo.findById(bus.getDriver().getId())
@@ -303,7 +384,8 @@ public class AdminController {
     @DeleteMapping("/buses/{busId}")
     public ResponseEntity<?> deleteBus(@PathVariable("busId") Long busId) {
         try {
-            // 1) Nullify active_trip_id in bus_state to avoid FK issues, then delete bus_state
+            // 1) Nullify active_trip_id in bus_state to avoid FK issues, then delete
+            // bus_state
             jdbc.update("UPDATE bus_state SET active_trip_id = NULL WHERE bus_id = ?", busId);
             jdbc.update("DELETE FROM bus_state WHERE bus_id = ? OR id = ?", busId, busId);
 
@@ -325,10 +407,11 @@ public class AdminController {
             // 7) Delete the bus
             busRepo.deleteById(busId);
 
-            return ResponseEntity.ok(Map.of("deleted", busId, "message", "Bus and all related data deleted successfully"));
+            return ResponseEntity
+                    .ok(Map.of("deleted", busId, "message", "Bus and all related data deleted successfully"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Operation failed. Please try again."));
         }
     }
 
@@ -350,7 +433,8 @@ public class AdminController {
     /**
      * ✅ NEW ENDPOINT: GET /api/admin/trips/{tripId}/stop-times
      * Returns all stop_times for a trip with stop names — shown in the modal.
-     * Response: [ { seq, stopId, stopName, arrivalDatetime, departureDatetime }, ... ]
+     * Response: [ { seq, stopId, stopName, arrivalDatetime, departureDatetime },
+     * ... ]
      */
     @GetMapping("/trips/{tripId}/stop-times")
     public ResponseEntity<?> getStopTimes(@PathVariable("tripId") Long tripId) {
@@ -368,7 +452,7 @@ public class AdminController {
             return ResponseEntity.ok(rows);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Operation failed. Please try again."));
         }
     }
 
@@ -381,7 +465,7 @@ public class AdminController {
      */
     @PostMapping("/routes/{routeId}/trips")
     public ResponseEntity<?> addTrip(@PathVariable("routeId") Long routeId,
-                                     @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body) {
         try {
             Long busId = Long.valueOf(body.get("busId").toString());
             String departureTimeStr = body.get("departureTime").toString();
@@ -394,8 +478,7 @@ public class AdminController {
             // 1) Insert trip
             jdbc.update(
                     "INSERT INTO trips (route_id, bus_id, departure_datetime, status) VALUES (?, ?, ?, 'scheduled')",
-                    routeId, busId, departureTimeStr
-            );
+                    routeId, busId, departureTimeStr);
 
             Long tripId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 
@@ -427,26 +510,25 @@ public class AdminController {
                 LocalDateTime departureDt = arrivalDt.plusMinutes(2);
 
                 String arrStr = (i == 0) ? null : arrivalDt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                String depStr = (i == routeStops.size() - 1) ? null : departureDt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                String depStr = (i == routeStops.size() - 1) ? null
+                        : departureDt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
                 jdbc.update(
                         "INSERT INTO stop_times (trip_id, stop_id, seq, arrival_datetime, departure_datetime) VALUES (?, ?, ?, ?, ?)",
                         tripId, stopId, seq,
                         arrStr,
-                        depStr
-                );
+                        depStr);
                 i++;
             }
 
             return ResponseEntity.ok(Map.of(
                     "tripId", tripId,
                     "stopTimesCreated", routeStops.size(),
-                    "message", "Trip and stop times created successfully"
-            ));
+                    "message", "Trip and stop times created successfully"));
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Operation failed. Please try again."));
         }
     }
 
@@ -462,12 +544,13 @@ public class AdminController {
      * Creates trips for every day between startDate and endDate at the given time.
      * Auto-generates stop_times for each trip.
      *
-     * Body: { "busId": 1, "startDate": "2025-12-01", "endDate": "2025-12-05", "departureTime": "08:00" }
+     * Body: { "busId": 1, "startDate": "2025-12-01", "endDate": "2025-12-05",
+     * "departureTime": "08:00" }
      */
     @Transactional
     @PostMapping("/routes/{routeId}/trips/bulk")
     public ResponseEntity<?> addBulkTrips(@PathVariable("routeId") Long routeId,
-                                          @RequestBody Map<String, Object> body) {
+            @RequestBody Map<String, Object> body) {
         try {
             Long busId = Long.valueOf(body.get("busId").toString());
             String startDateStr = body.get("startDate").toString();
@@ -476,7 +559,8 @@ public class AdminController {
             int gapDays = 1;
             if (body.containsKey("gapDays") && body.get("gapDays") != null) {
                 gapDays = Integer.parseInt(body.get("gapDays").toString());
-                if (gapDays < 1) gapDays = 1;
+                if (gapDays < 1)
+                    gapDays = 1;
             }
 
             routeRepo.findById(routeId).orElseThrow(() -> new RuntimeException("Route not found"));
@@ -487,7 +571,8 @@ public class AdminController {
             LocalTime time = LocalTime.parse(timeStr);
 
             if (start.isAfter(end)) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "End date must be after start date"));
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "End date must be after start date"));
             }
 
             int tripsCreated = 0;
@@ -507,8 +592,7 @@ public class AdminController {
 
                 jdbc.update(
                         "INSERT INTO trips (route_id, bus_id, departure_datetime, status) VALUES (?, ?, ?, 'scheduled')",
-                        routeId, busId, departureTimeStr
-                );
+                        routeId, busId, departureTimeStr);
 
                 Long tripId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
                 tripsCreated++;
@@ -522,15 +606,16 @@ public class AdminController {
                     LocalDateTime arrivalDt = departure.plusMinutes(offsetMin);
                     LocalDateTime departureDt = arrivalDt.plusMinutes(2);
 
-                    String arrStr = (i == 0) ? null : arrivalDt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                    String depStr = (i == routeStops.size() - 1) ? null : departureDt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    String arrStr = (i == 0) ? null
+                            : arrivalDt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    String depStr = (i == routeStops.size() - 1) ? null
+                            : departureDt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
                     jdbc.update(
                             "INSERT INTO stop_times (trip_id, stop_id, seq, arrival_datetime, departure_datetime) VALUES (?, ?, ?, ?, ?)",
                             tripId, stopId, seq,
                             arrStr,
-                            depStr
-                    );
+                            depStr);
                     totalStopTimes++;
                     i++;
                 }
@@ -539,12 +624,11 @@ public class AdminController {
             return ResponseEntity.ok(Map.of(
                     "tripsCreated", tripsCreated,
                     "stopTimesCreated", totalStopTimes,
-                    "message", tripsCreated + " trips created successfully"
-            ));
+                    "message", tripsCreated + " trips created successfully"));
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Operation failed. Please try again."));
         }
     }
 
@@ -573,7 +657,8 @@ public class AdminController {
             double lat = Double.parseDouble(body.get("lat").toString());
             double lng = Double.parseDouble(body.get("lng").toString());
             double speed = body.containsKey("speedKmph") ? Double.parseDouble(body.get("speedKmph").toString()) : 0.0;
-            double heading = body.containsKey("headingDeg") ? Double.parseDouble(body.get("headingDeg").toString()) : 0.0;
+            double heading = body.containsKey("headingDeg") ? Double.parseDouble(body.get("headingDeg").toString())
+                    : 0.0;
 
             Bus bus = busRepo.findById(busId)
                     .orElseThrow(() -> new RuntimeException("Bus not found"));
@@ -607,18 +692,16 @@ public class AdminController {
                         nearest_stop_id=VALUES(nearest_stop_id)
                     """,
                     busId, busId, routeId, lat, lng, speed, heading, now, now,
-                    activeTripId, nearestStopId
-            );
+                    activeTripId, nearestStopId);
 
             return ResponseEntity.ok(Map.of(
                     "updated", busId,
                     "lat", lat, "lng", lng,
                     "activeTripId", activeTripId != null ? activeTripId : "none",
-                    "nearestStopId", nearestStopId != null ? nearestStopId : "none"
-            ));
+                    "nearestStopId", nearestStopId != null ? nearestStopId : "none"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Operation failed. Please try again."));
         }
     }
 
@@ -627,20 +710,252 @@ public class AdminController {
     public ResponseEntity<?> getTripsForBus(@PathVariable("busId") Long busId) {
         try {
             String sql = """
-                SELECT t.id AS tripId,
-                       t.departure_datetime AS departureTime,
-                       r.name AS routeName,
-                       t.status
-                FROM trips t
-                JOIN routes r ON r.id = t.route_id
-                WHERE t.bus_id = ?
-                ORDER BY t.departure_datetime DESC
-                LIMIT 30
-                """;
+                    SELECT t.id AS tripId,
+                           t.departure_datetime AS departureTime,
+                           r.name AS routeName,
+                           t.status
+                    FROM trips t
+                    JOIN routes r ON r.id = t.route_id
+                    WHERE t.bus_id = ?
+                    ORDER BY t.departure_datetime DESC
+                    LIMIT 30
+                    """;
             List<Map<String, Object>> trips = jdbc.queryForList(sql, busId);
             return ResponseEntity.ok(trips);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("error", "Operation failed. Please try again."));
+        }
+    }
+
+    // ================= AGENT MANAGEMENT =================
+
+    /**
+     * POST /api/admin/agents
+     * Create a new agent account
+     * Body: { name, email, phone, password }
+     */
+    @PostMapping("/agents")
+    public ResponseEntity<?> createAgent(@RequestBody Map<String, String> body) {
+        try {
+            String name = body.get("name");
+            String email = body.get("email");
+            String phone = body.get("phone");
+            String password = body.get("password");
+
+            if (name == null || email == null || phone == null || password == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "All fields required: name, email, phone, password"));
+            }
+
+            if (agentRepo.findByEmail(email.trim().toLowerCase()).isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Agent with this email already exists"));
+            }
+
+            Agent agent = new Agent();
+            agent.setName(name.trim());
+            agent.setEmail(email.trim().toLowerCase());
+            agent.setPhone(phone.trim());
+            agent.setPasswordHash(BCrypt.hashpw(password, BCrypt.gensalt(12)));
+            agent.setActive(true);
+            agentRepo.save(agent);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "agentId", agent.getId(),
+                    "message", "Agent created: " + name));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to create agent: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * POST /api/admin/agents/{agentId}/assign-bus
+     * Assign a bus to an agent
+     * Body: { busId }
+     */
+    @PostMapping("/agents/{agentId}/assign-bus")
+    public ResponseEntity<?> assignBusToAgent(@PathVariable("agentId") Long agentId, @RequestBody Map<String, Object> body) {
+        try {
+            Object busIdObj = body.get("busId");
+            if (busIdObj == null) {
+                Map<String, Object> err = new java.util.HashMap<>();
+                err.put("error", "busId is required");
+                return ResponseEntity.badRequest().body(err);
+            }
+            Long busId = Long.valueOf(busIdObj.toString());
+
+            // Verify agent exists
+            if (agentRepo.findById(agentId).isEmpty()) {
+                Map<String, Object> err = new java.util.HashMap<>();
+                err.put("error", "Agent not found");
+                return ResponseEntity.status(404).body(err);
+            }
+            // Verify bus exists
+            if (busRepo.findById(busId).isEmpty()) {
+                Map<String, Object> err = new java.util.HashMap<>();
+                err.put("error", "Bus not found");
+                return ResponseEntity.status(404).body(err);
+            }
+
+            // Check not already assigned
+            Integer existing = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM agent_bus_assignments WHERE agent_id = ? AND bus_id = ?",
+                    Integer.class, agentId, busId);
+            if (existing != null && existing > 0) {
+                Map<String, Object> err = new java.util.HashMap<>();
+                err.put("error", "Bus already assigned to this agent");
+                return ResponseEntity.badRequest().body(err);
+            }
+
+            jdbc.update("INSERT INTO agent_bus_assignments (agent_id, bus_id, assigned_at) VALUES (?, ?, NOW())",
+                    agentId, busId);
+
+            Map<String, Object> resp = new java.util.HashMap<>();
+            resp.put("success", true);
+            resp.put("message", "Bus " + busId + " assigned to agent " + agentId);
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Map<String, Object> err = new java.util.HashMap<>();
+            err.put("error", "Failed to assign bus: " + e.getMessage());
+            return ResponseEntity.status(500).body(err);
+        }
+    }
+
+    /**
+     * GET /api/admin/agents
+     * List all agents with their assigned buses
+     */
+    @GetMapping("/agents")
+    public ResponseEntity<?> listAgents() {
+        try {
+            List<Map<String, Object>> agents = jdbc.queryForList(
+                    """
+                            SELECT a.id, a.name, a.email, a.phone, a.active, a.created_at,
+                                   (SELECT GROUP_CONCAT(route_id) FROM agent_route_assignments WHERE agent_id = a.id) AS assigned_routes,
+                                   (SELECT GROUP_CONCAT(CONCAT(b.id, ':', b.code) ORDER BY b.code)
+                                    FROM agent_bus_assignments aba
+                                    JOIN buses b ON b.id = aba.bus_id
+                                    WHERE aba.agent_id = a.id) AS assigned_buses
+                            FROM agents a
+                            ORDER BY a.created_at DESC
+                            """);
+            return ResponseEntity.ok(agents);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to list agents: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * DELETE /api/admin/agents/{agentId}
+     * Deactivate an agent (soft delete)
+     */
+    @DeleteMapping("/agents/{agentId}")
+    public ResponseEntity<?> deactivateAgent(@PathVariable("agentId") Long agentId) {
+        try {
+            Agent agent = agentRepo.findById(agentId).orElse(null);
+            if (agent == null) {
+                return ResponseEntity.status(404).body(Map.of("error", "Agent not found"));
+            }
+            agent.setActive(false);
+            agent.setAgentToken(null);
+            agent.setTokenExpiry(null);
+            agentRepo.save(agent);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Agent deactivated"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to deactivate agent"));
+        }
+    }
+
+    @GetMapping("/buses")
+    public ResponseEntity<?> getAllBuses() {
+        try {
+            List<Map<String, Object>> buses = jdbc.queryForList(
+                    "SELECT b.*, r.name as routeName FROM buses b LEFT JOIN routes r ON r.id = b.route_id");
+            return ResponseEntity.ok(buses);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch buses: " + e.getMessage()));
+        }
+    }
+
+    // ======================================
+    // NEW: Bus State / Manual Tracking
+    // ======================================
+
+    @GetMapping("/agents/{agentId}/assignments")
+    public ResponseEntity<?> getAgentAssignments(@PathVariable("agentId") Long agentId) {
+        try {
+            List<Long> routeIds = jdbc.queryForList(
+                    "SELECT route_id FROM agent_route_assignments WHERE agent_id = ?",
+                    Long.class, agentId);
+
+            List<Map<String, Object>> busRows = jdbc.queryForList(
+                    "SELECT b.route_id, aba.bus_id FROM agent_bus_assignments aba JOIN buses b ON b.id = aba.bus_id WHERE aba.agent_id = ?",
+                    agentId);
+
+            Map<Long, List<Long>> busesByRoute = new java.util.HashMap<>();
+            for (Map<String, Object> row : busRows) {
+                Long rId = ((Number) row.get("route_id")).longValue();
+                Long bId = ((Number) row.get("bus_id")).longValue();
+                busesByRoute.computeIfAbsent(rId, k -> new java.util.ArrayList<>()).add(bId);
+            }
+
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("routes", routeIds);
+            response.put("buses", busesByRoute);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Map<String, Object> err = new java.util.HashMap<>();
+            err.put("error", "Failed to fetch assignments: " + e.getMessage());
+            return ResponseEntity.status(500).body(err);
+        }
+    }
+
+    @PostMapping("/agents/{agentId}/assign-route")
+    public ResponseEntity<?> assignRouteToAgent(@PathVariable("agentId") Long agentId, @RequestBody Map<String, Object> body) {
+        try {
+            Long routeId = Long.valueOf(body.get("routeId").toString());
+
+            Integer existing = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM agent_route_assignments WHERE agent_id = ? AND route_id = ?",
+                    Integer.class, agentId, routeId);
+            if (existing != null && existing > 0) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Route already assigned"));
+            }
+
+            jdbc.update("INSERT INTO agent_route_assignments (agent_id, route_id, assigned_at) VALUES (?, ?, NOW())",
+                    agentId, routeId);
+
+            return ResponseEntity.ok(Map.of("success", true, "message", "Route assigned"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to assign route: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/agents/{agentId}/unassign-route/{routeId}")
+    public ResponseEntity<?> unassignRouteFromAgent(@PathVariable("agentId") Long agentId, @PathVariable("routeId") Long routeId) {
+        try {
+            jdbc.update("DELETE FROM agent_route_assignments WHERE agent_id = ? AND route_id = ?", agentId, routeId);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Route unassigned"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to unassign route: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/agents/{agentId}/unassign-bus/{busId}")
+    public ResponseEntity<?> unassignBusFromAgent(@PathVariable("agentId") Long agentId, @PathVariable("busId") Long busId) {
+        try {
+            jdbc.update("DELETE FROM agent_bus_assignments WHERE agent_id = ? AND bus_id = ?", agentId, busId);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Bus unassigned"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to unassign bus: " + e.getMessage()));
         }
     }
 }
