@@ -57,8 +57,20 @@ export default function AuthForm({ onSuccess, onCancel }) {
         });
         const d = await res.json();
         if (!res.ok) throw new Error(d.error || 'Failed');
-        setSuccessMsg('Reset link sent to your email.');
-        setTimeout(() => setMode('login'), 3000);
+        setSuccessMsg('OTP sent to your email.');
+        setMode('reset');
+      } catch (err) { setError(err.message); }
+    }
+    else if (mode === 'reset') {
+      try {
+        const res = await fetch(getApiUrl('/api/auth/reset-password'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: form.email, otp: form.otp, password: form.password })
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Failed');
+        setSuccessMsg('Password reset successful! You can now login.');
+        setTimeout(() => setMode('login'), 2000);
       } catch (err) { setError(err.message); }
     }
 
@@ -85,12 +97,12 @@ export default function AuthForm({ onSuccess, onCancel }) {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>{mode === 'login' ? '👋' : mode === 'register' ? '🎉' : '🔐'}</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: '#1e293b' }}>
-            {mode === 'login' ? 'Welcome Back' : mode === 'register' ? 'Create Account' : 'Reset Password'}
+            {mode === 'login' ? 'Welcome Back' : mode === 'register' ? 'Create Account' : mode === 'forgot' ? 'Forgot Password' : 'Set New Password'}
           </div>
           <div style={{ fontSize: 14, color: '#64748b', marginTop: 4 }}>
             {mode === 'login' ? 'Login to book your tickets faster'
               : mode === 'register' ? 'Join us to track and manage your bookings'
-                : 'Enter your email to receive a reset link'}
+                : mode === 'forgot' ? 'Enter your email to receive an OTP' : 'Enter the OTP and your new password'}
           </div>
         </div>
 
@@ -124,10 +136,10 @@ export default function AuthForm({ onSuccess, onCancel }) {
             </div>
           )}
 
-          {(mode === 'login' || mode === 'register') && (
+          {(mode === 'login' || mode === 'register' || mode === 'reset') && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <label style={{ ...lbl, marginBottom: 0 }}>PASSWORD</label>
+                <label style={{ ...lbl, marginBottom: 0 }}>{mode === 'reset' ? 'NEW PASSWORD' : 'PASSWORD'}</label>
                 {mode === 'login' && (
                   <button type="button" onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); }} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                     Forgot Password?
@@ -135,6 +147,13 @@ export default function AuthForm({ onSuccess, onCancel }) {
                 )}
               </div>
               <input required type="password" style={inp} value={form.password} onChange={e => update({ password: e.target.value })} placeholder="••••••••" />
+            </div>
+          )}
+
+          {mode === 'reset' && (
+            <div>
+              <label style={lbl}>ENTER OTP</label>
+              <input required style={inp} value={form.otp || ''} onChange={e => update({ otp: e.target.value })} placeholder="6-digit code" maxLength={6} />
             </div>
           )}
 
@@ -148,7 +167,7 @@ export default function AuthForm({ onSuccess, onCancel }) {
           <button disabled={loading} type="submit" style={{
             padding: '14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 10, boxShadow: '0 4px 12px rgba(37,99,235,0.2)'
           }}>
-            {loading ? 'Please wait...' : mode === 'login' ? 'Login' : mode === 'register' ? 'Sign Up' : 'Send Reset Link'}
+            {loading ? 'Please wait...' : mode === 'login' ? 'Login' : mode === 'register' ? 'Sign Up' : mode === 'forgot' ? 'Send OTP' : 'Reset Password'}
           </button>
 
           <div style={{ textAlign: 'center', fontSize: 13, color: '#64748b', marginTop: 12 }}>

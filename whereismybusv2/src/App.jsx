@@ -11,6 +11,7 @@ import BookingPage   from './components/BookingPage';
 import AuthForm      from './components/AuthForm';
 import UserDashboard from './components/UserDashboard';
 import SupportPage   from './components/SupportPage';
+import BottomNav     from './components/BottomNav';
 
 // Hooks
 import { useAuth }             from './hooks/useAuth';
@@ -190,6 +191,8 @@ function App() {
           onCancel={() => setShowAuth(false)}
         />
       )}
+
+      <BottomNav />
     </div>
   );
 }

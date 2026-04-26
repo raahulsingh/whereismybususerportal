@@ -45,8 +45,12 @@ export default function SearchSection({ onResults, searchInfo }) {
 
   // Today / Tomorrow quick buttons
   const setDay = (offset) => {
-    const d = new Date(); d.setDate(d.getDate() + offset);
-    setForm(f => ({ ...f, date: new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0] }));
+    const d = new Date(); 
+    d.setDate(d.getDate() + offset);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setForm(f => ({ ...f, date: `${year}-${month}-${day}` }));
   };
 
   return (

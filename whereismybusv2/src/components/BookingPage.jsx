@@ -23,6 +23,7 @@ export default function BookingPage({ user, onRequestLogin }) {
   const [paymentSeats, setPaymentSeats] = useState([]);
   const [paymentPassengers, setPaymentPassengers] = useState([]);
   const [bookingError, setBookingError] = useState('');
+  const [resetKey, setResetKey] = useState(0);
 
   // Determine protection based on path
   const currentPath = location.pathname.split('/').pop() || 'search';
@@ -106,14 +107,17 @@ export default function BookingPage({ user, onRequestLogin }) {
   };
 
   const handleBookMore = () => {
-    navigate('/book/seats');
     setConfirmedData(null); setConfirmedSeats([]); setConfirmedPassengers([]);
+    setPaymentSeats([]); setPaymentPassengers([]);
+    setResetKey(k => k + 1);
+    navigate('/book/seats');
   };
 
   const reset = () => {
     navigate('/book/search'); setResults([]); setSelectedTrip(null);
     setConfirmedData(null); setConfirmedSeats([]); setConfirmedPassengers([]);
     setPaymentSeats([]); setPaymentPassengers([]); setBookingError('');
+    setResetKey(k => k + 1);
   };
 
   return (
@@ -152,6 +156,7 @@ export default function BookingPage({ user, onRequestLogin }) {
         <Route path="results" element={<BusList results={results} searchInfo={searchInfo} onSelect={handleSelect} />} />
         <Route path="seats" element={
           <SeatLayout
+            key={resetKey}
             trip={selectedTrip}
             searchInfo={searchInfo}
             user={user}
