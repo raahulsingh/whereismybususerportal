@@ -85,12 +85,13 @@ function App() {
 
       const routes = (data?.routeOptions || []).map(item => ({
         tripId:          item.tripId,
-        busName:         item.busCode,
+        busCode:         item.busCode,
+        busName:         item.busName,
         departureTime:   item.fromTime,
         arrivalTime:     item.toTime,
         duration:        calculateDuration(item.fromTime, item.toTime),
-        sourceStop:      item.sourceStop,
-        destinationStop: item.destinationStop,
+        sourceStop:      item.sourceStop || item.fromStopName,
+        destinationStop: item.destinationStop || item.toStopName,
         travelDate:      item.travelDate || date,
       }));
 
