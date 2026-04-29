@@ -191,7 +191,14 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
       {/* Header */}
       <div className="trip-details-header">
         <div>
-          <div className="trip-bus-code">{busCode}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="trip-bus-code" style={{ fontSize: 22 }}>{details.busName || 'Express Bus'}</div>
+            <span style={{ 
+              background: '#f1f5f9', color: '#64748b', fontSize: 12, 
+              fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+              border: '1px solid #e2e8f0', marginTop: 4
+            }}>#{busCode}</span>
+          </div>
           <div className="trip-route-name">{routeName}</div>
         </div>
         <div className="trip-bus-location">

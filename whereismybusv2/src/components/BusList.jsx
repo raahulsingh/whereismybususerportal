@@ -42,8 +42,17 @@ export default function BusList({ results, searchInfo, onSelect }) {
           >
             <div className="trip-card-row mobile-col" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 17 }}>🚌 {bus.busCode}</div>
-                <div style={{ fontSize: 13, color: '#64748b' }}>{bus.routeName}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 17, color: '#1e293b' }}>🚌 {bus.busName || 'Express Bus'}</div>
+                  <span style={{ 
+                    background: '#f1f5f9', color: '#64748b', fontSize: 11, 
+                    fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                    border: '1px solid #e2e8f0'
+                  }}>#{bus.busCode}</span>
+                </div>
+                <div style={{ fontSize: 13, color: '#2563eb', fontWeight: 600, marginTop: 2 }}>
+                  {bus.fromStopName} <span style={{ color: '#94a3b8', margin: '0 4px' }}>→</span> {bus.toStopName}
+                </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
