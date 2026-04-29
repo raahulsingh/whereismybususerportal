@@ -40,7 +40,7 @@ export default function BookingConfirmed({ bookingData, trip, seats, passengers,
           </div>
           <div class="row"><span class="label">Passenger</span><span class="value">${p.name}</span></div>
           ${p.age ? `<div class="row"><span class="label">Age</span><span class="value">${p.age}</span></div>` : ''}
-          <div class="row"><span class="label">Bus</span><span class="value">${trip.busCode} ${trip.busPlate ? '(' + trip.busPlate + ')' : ''}</span></div>
+          <div class="row"><span class="label">Bus</span><span class="value">${trip.busName || trip.busCode} ${trip.busPlate ? '(' + trip.busPlate + ')' : ''}</span></div>
           <div class="row"><span class="label">Route</span><span class="value">${trip.fromStopName} → ${trip.toStopName}</span></div>
           <div class="row"><span class="label">Departure</span><span class="value">${fmt(trip.fromTime)}</span></div>
           <div class="row"><span class="label">Amount</span><span class="value" style="color:#16a34a">₹${(Array.isArray(seats) && seats[i] && typeof seats[i] === 'object') ? seats[i].price.toFixed(0) : Number(trip.price).toFixed(0)}</span></div>
@@ -66,7 +66,7 @@ export default function BookingConfirmed({ bookingData, trip, seats, passengers,
 
     let message = `🚌 *Where is my Bus - Ticket Confirmed* ✅\n\n`;
     message += `*Route:* ${trip.fromStopName} \u2794 ${trip.toStopName}\n`;
-    message += `*Bus:* ${trip.busCode} ${trip.busPlate ? '(' + trip.busPlate + ')' : ''}\n`;
+    message += `*Bus:* ${trip.busName || trip.busCode} ${trip.busPlate ? '(' + trip.busPlate + ')' : ''}\n`;
     message += `*Date:* ${fmtDate(searchInfo?.date)}\n`;
     message += `*Time:* ${fmt(trip.fromTime)}\n\n`;
 
@@ -111,7 +111,7 @@ export default function BookingConfirmed({ bookingData, trip, seats, passengers,
                 <span style={{ color: '#64748b' }}>Passenger</span><strong>{p.name}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Bus</span><strong>{trip.busCode} {trip.busPlate ? `(${trip.busPlate})` : ''}</strong>
+                <span style={{ color: '#64748b' }}>Bus</span><strong>{trip.busName || trip.busCode} {trip.busPlate ? `(${trip.busPlate})` : ''}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#64748b' }}>Route</span>
