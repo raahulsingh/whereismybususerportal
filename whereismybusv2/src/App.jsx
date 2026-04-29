@@ -90,8 +90,8 @@ function App() {
         departureTime:   item.fromTime,
         arrivalTime:     item.toTime,
         duration:        calculateDuration(item.fromTime, item.toTime),
-        sourceStop:      item.sourceStop || item.fromStopName,
-        destinationStop: item.destinationStop || item.toStopName,
+        sourceStop:      item.sourceStop || item.fromStopName || fromStop.name,
+        destinationStop: item.destinationStop || item.toStopName || toStop.name,
         travelDate:      item.travelDate || date,
       }));
 
