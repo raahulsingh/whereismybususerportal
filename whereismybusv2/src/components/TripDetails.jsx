@@ -197,7 +197,7 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
               background: '#f1f5f9', color: '#64748b', fontSize: 12, 
               fontWeight: 700, padding: '3px 8px', borderRadius: 6,
               border: '1px solid #e2e8f0', marginTop: 4
-            }}>#{busCode}</span>
+            }}>{busCode}</span>
           </div>
           <div className="trip-route-name">{routeName}</div>
         </div>

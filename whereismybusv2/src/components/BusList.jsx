@@ -48,7 +48,7 @@ export default function BusList({ results, searchInfo, onSelect }) {
                     background: '#f1f5f9', color: '#64748b', fontSize: 11, 
                     fontWeight: 700, padding: '2px 6px', borderRadius: 4,
                     border: '1px solid #e2e8f0'
-                  }}>#{bus.busCode}</span>
+                  }}> {bus.busCode}</span>
                 </div>
                 <div style={{ fontSize: 13, color: '#2563eb', fontWeight: 600, marginTop: 2 }}>
                   {bus.fromStopName} <span style={{ color: '#94a3b8', margin: '0 4px' }}>→</span> {bus.toStopName}
