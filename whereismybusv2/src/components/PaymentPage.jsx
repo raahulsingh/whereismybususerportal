@@ -58,6 +58,7 @@ export default function PaymentPage({ trip, searchInfo, seats, passengers, onPay
           route: `${searchInfo.from} \u2192 ${searchInfo.to}`,
           date: searchInfo.date,
         },
+        image: 'https://whereismybususerportal.vercel.app/logo_blue.png',
         theme: {
           color: '#e65100',
         },
