@@ -82,7 +82,7 @@ export default function PaymentPage({ trip, searchInfo, seats, passengers, onPay
               setPaymentId(response.razorpay_payment_id);
               setPaymentStage('success');
               // Auto-trigger booking after short delay
-              setTimeout(() => onPaymentSuccess(), 2000);
+              setTimeout(() => onPaymentSuccess(response.razorpay_payment_id), 2000);
             } else {
               setPaymentStage('failed');
               setError('Payment verification failed. Please contact support.');

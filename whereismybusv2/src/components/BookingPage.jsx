@@ -58,7 +58,7 @@ export default function BookingPage({ user, onRequestLogin }) {
   };
 
   // Called after payment succeeds — now actually book via API
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = async (paymentId) => {
     setBookingError('');
     const refs = [];
     try {
@@ -93,8 +93,9 @@ export default function BookingPage({ user, onRequestLogin }) {
       setConfirmedSeats(paymentSeats);
       setConfirmedPassengers(paymentPassengers);
       navigate('/book/confirmed');
-    } catch {
-      setBookingError('Booking failed after payment. Contact support.');
+    } catch (e) {
+      console.error('Booking Error:', e);
+      setBookingError(`Booking failed after payment (ID: ${paymentId || 'N/A'}). Please contact support with this ID.`);
       navigate('/book/seats');
     }
   };
