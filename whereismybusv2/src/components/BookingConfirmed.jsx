@@ -3,9 +3,27 @@ import { fmtDate, fmt } from "../utils/bookingUtils";
 
 // ── Step 4: Booking Confirmed ────────────────────────────────────
 export default function BookingConfirmed({ bookingData, trip, seats, passengers, onDone, onBookMore, searchInfo }) {
+  // Guard: if state was lost (e.g., page refresh), show fallback
+  if (!bookingData || !trip || !passengers || passengers.length === 0) {
+    return (
+      <div style={{ maxWidth: 500, margin: '60px auto', textAlign: 'center', background: '#fff', borderRadius: 16, padding: '48px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+        <div style={{ fontSize: 52, marginBottom: 16 }}>✅</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: '#16a34a', marginBottom: 8 }}>Booking Confirmed!</div>
+        <div style={{ fontSize: 14, color: '#64748b', marginBottom: 24 }}>Your ticket has been booked successfully. You can view your bookings from the home page.</div>
+        <button onClick={() => window.location.href = '/'} style={{
+          padding: '14px 28px', background: '#2563eb', color: '#fff', border: 'none',
+          borderRadius: 10, fontSize: 16, fontWeight: 700, cursor: 'pointer',
+          boxShadow: '0 4px 16px rgba(37,99,235,0.2)'
+        }}>
+          Go to Home
+        </button>
+      </div>
+    );
+  }
+
   const totalAmount = Array.isArray(seats) && seats.length > 0 && typeof seats[0] === 'object'
     ? seats.reduce((sum, s) => sum + (s.price || Number(trip.price)), 0)
-    : seats.length * Number(trip.price);
+    : (seats || []).length * Number(trip.price);
   const printRef = React.useRef(null);
 
   const handlePrint = () => {

@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { duration, fmt, fmtDate } from "../utils/bookingUtils";
 import { getApiUrl } from "../apiConfig";
 
 
 // ── Step 3.5: Payment Gateway (Razorpay) ─────────────────────────
-export default function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, onBack }) {
+export default function PaymentPage({ trip, searchInfo, seats, passengers, onPaymentSuccess, onBack, user }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [paymentStage, setPaymentStage] = useState('summary'); // 'summary' | 'processing' | 'success' | 'failed'
   const [paymentId, setPaymentId] = useState('');
+  const [countdown, setCountdown] = useState(10);
 
   // Calculate from individual seat prices if available (seat vs sleeper may differ)
   const baseAmount = Array.isArray(seats) && seats.length > 0 && typeof seats[0] === 'object'
@@ -22,6 +23,35 @@ export default function PaymentPage({ trip, searchInfo, seats, passengers, onPay
     setLoading(true);
     setError('');
     try {
+      // ── PRE-PAYMENT LOCK CHECK ──
+      // Verify all seats are still locked by this user before charging money
+      const userId = user ? String(user.id) : 'anon';
+      const seatNos = Array.isArray(seats) && seats.length > 0 && typeof seats[0] === 'object'
+        ? seats.map(s => s.seatNo) : seats;
+      
+      for (const seatNo of seatNos) {
+        try {
+          const lockRes = await fetch(getApiUrl('/api/booking/lock'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tripId: trip.tripId, seatNo, userId,
+              travelDate: searchInfo.date || ''
+            })
+          });
+          if (!lockRes.ok) {
+            const errData = await lockRes.json();
+            setError(`Seat ${seatNo}: ${errData.error || 'is no longer available'}. Please go back and select another seat.`);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          setError(`Could not verify seat ${seatNo}. Please try again.`);
+          setLoading(false);
+          return;
+        }
+      }
+
       // Step 1: Create Razorpay order on backend
       const orderRes = await fetch(getApiUrl('/api/payment/create-order'), {
         method: 'POST',
@@ -134,6 +164,35 @@ export default function PaymentPage({ trip, searchInfo, seats, passengers, onPay
     }
   };
 
+  // FAILED — unlock all seats and auto-redirect to home in 10s
+  useEffect(() => {
+    if (paymentStage === 'failed') {
+      // Unlock all locked seats
+      const userId = user ? String(user.id) : 'anon';
+      const seatNos = Array.isArray(seats) && seats.length > 0 && typeof seats[0] === 'object'
+        ? seats.map(s => s.seatNo) : seats;
+      seatNos.forEach(seatNo => {
+        fetch(getApiUrl('/api/booking/unlock'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tripId: trip.tripId, seatNo, userId })
+        }).catch(() => {});
+      });
+
+      // Countdown & redirect
+      let count = 10;
+      setCountdown(count);
+      const timer = setInterval(() => {
+        count--;
+        setCountdown(count);
+        if (count <= 0) {
+          clearInterval(timer);
+          window.location.href = '/';
+        }
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [paymentStage]);
+
   // PROCESSING SCREEN
   if (paymentStage === 'processing') {
     return (
@@ -171,6 +230,7 @@ export default function PaymentPage({ trip, searchInfo, seats, passengers, onPay
     );
   }
 
+
   // FAILED SCREEN
   if (paymentStage === 'failed') {
     return (
@@ -178,23 +238,20 @@ export default function PaymentPage({ trip, searchInfo, seats, passengers, onPay
         <div style={{ background: '#fff', borderRadius: 20, padding: '60px 40px', boxShadow: '0 8px 40px rgba(0,0,0,0.1)' }}>
           <div style={{ fontSize: 64, marginBottom: 16 }}>{'\u274c'}</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: '#ef4444', marginBottom: 8 }}>Payment Failed</div>
-          <div style={{ fontSize: 14, color: '#64748b', marginBottom: 20 }}>{error || 'Something went wrong'}</div>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button onClick={onBack}
-              style={{
-                padding: '12px 24px', background: '#f1f5f9', border: 'none', borderRadius: 10,
-                fontWeight: 600, cursor: 'pointer', fontSize: 14, color: '#475569'
-              }}>
-              {'\u2190'} Back
-            </button>
-            <button onClick={() => { setPaymentStage('summary'); setError(''); }}
-              style={{
-                padding: '12px 24px', background: '#e65100', color: '#fff', border: 'none',
-                borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 14
-              }}>
-              Try Again
-            </button>
+          <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12 }}>{error || 'Something went wrong'}</div>
+          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>
+            Redirecting to home in <strong style={{ color: '#ef4444' }}>{countdown}</strong> seconds...
           </div>
+          <div style={{ width: '100%', height: 4, background: '#fee2e2', borderRadius: 2, overflow: 'hidden', marginBottom: 20 }}>
+            <div style={{ width: `${(countdown / 10) * 100}%`, height: '100%', background: '#ef4444', transition: 'width 1s linear', borderRadius: 2 }} />
+          </div>
+          <button onClick={() => { window.location.href = '/'; }}
+            style={{
+              padding: '12px 24px', background: '#f1f5f9', border: 'none', borderRadius: 10,
+              fontWeight: 600, cursor: 'pointer', fontSize: 14, color: '#475569'
+            }}>
+            Go to Home Now
+          </button>
         </div>
       </div>
     );

@@ -104,6 +104,7 @@ export default function BookingPage({ user, onRequestLogin }) {
     setConfirmedData({ ...data, trip });
     setConfirmedSeats(seats);
     setConfirmedPassengers(passengers);
+
     navigate('/book/confirmed');
   };
 
@@ -171,6 +172,7 @@ export default function BookingPage({ user, onRequestLogin }) {
             searchInfo={searchInfo}
             seats={paymentSeats}
             passengers={paymentPassengers}
+            user={user}
             onPaymentSuccess={handlePaymentSuccess}
             onBack={() => navigate('/book/seats')}
           />

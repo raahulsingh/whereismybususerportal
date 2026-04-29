@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { fmt } from "../utils/bookingUtils";
 import { getApiUrl } from "../apiConfig";
 
@@ -6,6 +6,7 @@ import { getApiUrl } from "../apiConfig";
 export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayment, user }) {
   const [layout, setLayout] = useState(null);
   const [booked, setBooked] = useState([]);
+  const [locked, setLocked] = useState([]); // Seats locked by others
   const [selected, setSelected] = useState([]); // Array of { seatNo, type, price }
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState('seats');
@@ -13,6 +14,7 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
   const [booking, setBooking] = useState(false);
   const [viewDeck, setViewDeck] = useState('lower');
   const [passengers, setPassengers] = useState([]);
+  const selectedRef = useRef([]);
 
   const seatPrice = Number(trip.price);
   const sleeperPrice = trip.sleeperPrice ? Number(trip.sleeperPrice) : seatPrice * 1.5;
@@ -26,11 +28,14 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
     return seats;
   };
 
-  useEffect(() => {
+  // Keep ref in sync with state for cleanup
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+
+  const fetchSeats = () => {
     fetch(getApiUrl(`/api/booking/trips/${trip.tripId}/seats?date=${encodeURIComponent(searchInfo.date || '')}&fromStop=${encodeURIComponent(searchInfo.from || '')}&toStop=${encodeURIComponent(searchInfo.to || '')}`))
       .then(r => { if (!r.ok) throw new Error('API error ' + r.status); return r.json(); })
       .then(d => {
-        if (d.layoutJson) {
+        if (d.layoutJson && !layout) {
           try {
             const parsed = JSON.parse(d.layoutJson);
             if (parsed.length > 0) {
@@ -40,11 +45,38 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
               setLayout(normalized);
             } else { setLayout(generateLayout()); }
           } catch { setLayout(generateLayout()); }
-        } else { setLayout(generateLayout()); }
+        } else if (!layout) { setLayout(generateLayout()); }
         setBooked(d.bookedSeats || []);
+        setLocked(d.lockedSeats || []);
       })
-      .catch(() => { setLayout(generateLayout()); setBooked([]); })
+      .catch(() => { if (!layout) { setLayout(generateLayout()); } setBooked([]); })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchSeats();
+    // Auto-refresh every 5 seconds to keep locks in sync
+    const interval = setInterval(fetchSeats, 5000);
+    return () => clearInterval(interval);
+  }, [trip.tripId]);
+
+  // Cleanup: unlock all selected seats when user leaves the page
+  useEffect(() => {
+    return () => {
+      const seats = selectedRef.current;
+      if (seats.length > 0) {
+        const userId = user ? String(user.id) : 'anon';
+        seats.forEach(s => {
+          const payload = JSON.stringify({
+            tripId: trip.tripId, seatNo: s.seatNo, userId
+          });
+          navigator.sendBeacon(
+            getApiUrl('/api/booking/unlock'),
+            new Blob([payload], { type: 'application/json' })
+          );
+        });
+      }
+    };
   }, [trip.tripId]);
 
   const hasUpperDeck = layout ? layout.some(s => s.deck === 'upper') : false;
@@ -54,11 +86,48 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
 
   const getPriceForType = (type) => type === 'sleeper' ? sleeperPrice : seatPrice;
 
-  const toggleSeat = (seatNo, seatType) => {
-    setSelected(prev => {
-      if (prev.find(s => s.seatNo === seatNo)) return prev.filter(s => s.seatNo !== seatNo);
-      return [...prev, { seatNo, type: seatType || 'seat', price: getPriceForType(seatType || 'seat') }];
-    });
+  const toggleSeat = async (seatNo, seatType) => {
+    const isSelected = selected.find(s => s.seatNo === seatNo);
+    
+    if (!isSelected) {
+      // LOCK SEAT
+      try {
+        const res = await fetch(getApiUrl('/api/booking/lock'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId: trip.tripId,
+            seatNo,
+            userId: user ? user.id : 'anon',
+            travelDate: searchInfo.date || ''
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'Seat is currently unavailable');
+          return;
+        }
+        setSelected([...selected, { seatNo, type: seatType || 'seat', price: getPriceForType(seatType || 'seat') }]);
+      } catch (e) {
+        console.error('Lock error:', e);
+      }
+    } else {
+      // UNLOCK SEAT
+      try {
+        await fetch(getApiUrl('/api/booking/unlock'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId: trip.tripId,
+            seatNo,
+            userId: user ? user.id : 'anon'
+          })
+        });
+        setSelected(selected.filter(s => s.seatNo !== seatNo));
+      } catch (e) {
+        console.error('Unlock error:', e);
+      }
+    }
   };
 
   const totalAmount = selected.reduce((sum, s) => sum + s.price, 0);
@@ -77,7 +146,26 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
     setPassengers(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
   };
 
-  const confirmBooking = () => {
+  const removePassenger = async (idx) => {
+    const seatNo = passengers[idx].seatNo;
+    // Unlock the seat
+    try {
+      await fetch(getApiUrl('/api/booking/unlock'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tripId: trip.tripId, seatNo, userId: user ? String(user.id) : 'anon' })
+      });
+    } catch (e) { console.error('Unlock error:', e); }
+    // Remove from selected and passengers
+    setSelected(prev => prev.filter(s => s.seatNo !== seatNo));
+    setPassengers(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      if (updated.length === 0) setStep('seats');
+      return updated;
+    });
+  };
+
+  const confirmBooking = async () => {
     for (let i = 0; i < passengers.length; i++) {
       if (!passengers[i].name.trim() || !passengers[i].phone.trim()) {
         setError(`Passenger ${i + 1} (Seat ${passengers[i].seatNo}): Name and phone number are required.`);
@@ -85,6 +173,45 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
       }
     }
     setError('');
+
+    // Pre-payment check: verify all seats are still locked by us
+    try {
+      const res = await fetch(getApiUrl(`/api/booking/trips/${trip.tripId}/seats?date=${encodeURIComponent(searchInfo.date || '')}&fromStop=${encodeURIComponent(searchInfo.from || '')}&toStop=${encodeURIComponent(searchInfo.to || '')}`));
+      const data = await res.json();
+      const currentBooked = data.bookedSeats || [];
+      const currentLocked = data.lockedSeats || [];
+      const userId = user ? String(user.id) : 'anon';
+
+      const conflictSeats = selected.filter(s => 
+        currentBooked.includes(s.seatNo) || 
+        (currentLocked.includes(s.seatNo) && false) // locked by us is fine
+      );
+
+      // Re-verify each seat lock is ours
+      for (const s of selected) {
+        try {
+          const lockRes = await fetch(getApiUrl('/api/booking/lock'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tripId: trip.tripId, seatNo: s.seatNo, userId, travelDate: searchInfo.date || '' })
+          });
+          if (!lockRes.ok) {
+            const errData = await lockRes.json();
+            setError(`Seat ${s.seatNo}: ${errData.error || 'is no longer available'}. Please go back and select another seat.`);
+            // Remove the conflicting seat
+            setSelected(prev => prev.filter(sel => sel.seatNo !== s.seatNo));
+            setPassengers(prev => prev.filter(p => p.seatNo !== s.seatNo));
+            return;
+          }
+        } catch (e) {
+          setError(`Could not verify seat ${s.seatNo}. Please try again.`);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Pre-payment check error:', e);
+    }
+
     if (onGoToPayment) onGoToPayment(selected, passengers);
   };
 
@@ -125,6 +252,7 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
               ['linear-gradient(135deg, #ecfdf5, #d1fae5)', '#22c55e', '💺 Seat'],
               ['linear-gradient(135deg, #ede9fe, #ddd6fe)', '#a78bfa', '🛏️ Sleeper'],
               ['#fef9c3', '#f59e0b', '✅ Selected'],
+              ['#fff7ed', '#fdba74', '⏳ Reserved'],
               ['#f1f5f9', '#cbd5e1', '🚫 Booked'],
             ].map(([bg, col, label]) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -166,6 +294,7 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
                   );
 
                   const isBooked = booked.includes(seat.seatNo);
+                  const isLockedByOther = locked.includes(seat.seatNo) && !selected.some(s => s.seatNo === seat.seatNo);
                   const isSelected = selected.some(s => s.seatNo === seat.seatNo);
                   const isSleeper = seat.type === 'sleeper';
                   const price = getPriceForType(seat.type);
@@ -175,6 +304,8 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
                   let bg, border, color;
                   if (isBooked) {
                     bg = '#f1f5f9'; border = '2px solid #cbd5e1'; color = '#94a3b8';
+                  } else if (isLockedByOther) {
+                    bg = '#fff7ed'; border = '2px dashed #fdba74'; color = '#ea580c';
                   } else if (isSelected) {
                     bg = '#fef9c3'; border = '2px solid #f59e0b'; color = '#854d0e';
                   } else if (isSleeper) {
@@ -183,26 +314,29 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
                     bg = 'linear-gradient(135deg, #ecfdf5, #d1fae5)'; border = '2px solid #6ee7b7'; color = '#15803d';
                   }
 
+                  const isDisabled = isBooked || isLockedByOther;
+
                   return (
                     <React.Fragment key={col}>
                       {col === aisleAfter + 1 && <div style={{ width: 24 }} />}
-                      <div onClick={() => !isBooked && toggleSeat(seat.seatNo, seat.type)}
-                        title={`${seat.seatNo} — ${isSleeper ? 'Sleeper' : 'Seat'} ₹${price}`}
+                      <div onClick={() => !isDisabled && toggleSeat(seat.seatNo, seat.type)}
+                        title={isLockedByOther ? 'Reserved by another user' : `${seat.seatNo} — ${isSleeper ? 'Sleeper' : 'Seat'} ₹${price}`}
                         style={{
                           width: 54, height: seatH, borderRadius: isSleeper ? 14 : 10,
                           display: 'flex', flexDirection: 'column',
                           alignItems: 'center', justifyContent: 'center',
                           fontSize: 11, fontWeight: 700,
-                          cursor: isBooked ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
+                          cursor: isDisabled ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
                           background: bg, border, color,
                           transform: isSelected ? 'scale(1.08)' : 'scale(1)',
                           boxShadow: isSelected ? '0 0 0 3px #fcd34d55' : '0 1px 4px rgba(0,0,0,0.07)',
                         }}>
                         <span style={{ fontSize: isSleeper ? 26 : 18 }}>
-                          {isBooked ? '🚫' : isSelected ? '✅' : isSleeper ? '🛏️' : '💺'}
+                          {isBooked ? '🚫' : isLockedByOther ? '⏳' : isSelected ? '✅' : isSleeper ? '🛏️' : '💺'}
                         </span>
                         <span style={{ fontSize: 11 }}>{seat.seatNo}</span>
-                        {!isBooked && <span style={{ fontSize: 9, color: isSelected ? '#854d0e' : color, marginTop: 1 }}>₹{price.toFixed(0)}</span>}
+                        {!isDisabled && <span style={{ fontSize: 9, color: isSelected ? '#854d0e' : color, marginTop: 1 }}>₹{price.toFixed(0)}</span>}
+                        {isLockedByOther && <span style={{ fontSize: 8, color: '#ea580c', fontWeight: 600 }}>RESERVED</span>}
                       </div>
                     </React.Fragment>
                   );
@@ -251,7 +385,15 @@ export default function SeatLayout({ trip, searchInfo, onSeatBooked, onGoToPayme
             const seatInfo = selected.find(s => s.seatNo === p.seatNo);
             const isSleeper = seatInfo && seatInfo.type === 'sleeper';
             return (
-              <div key={p.seatNo} style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <div key={p.seatNo} style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 10px rgba(0,0,0,0.06)', position: 'relative' }}>
+                {passengers.length > 1 && (
+                  <button onClick={() => removePassenger(idx)} title="Remove this passenger" style={{
+                    position: 'absolute', top: 10, right: 10, width: 28, height: 28,
+                    borderRadius: '50%', border: '2px solid #fca5a5', background: '#fef2f2',
+                    color: '#ef4444', fontSize: 16, fontWeight: 700, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1
+                  }}>×</button>
+                )}
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14, color: isSleeper ? '#7c3aed' : '#2563eb' }}>
                   {isSleeper ? '🛏️' : '💺'} {isSleeper ? 'Sleeper' : 'Seat'} {p.seatNo} — Passenger {idx + 1}
                   <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b', marginLeft: 8 }}>₹{(seatInfo?.price || seatPrice).toFixed(0)}</span>
