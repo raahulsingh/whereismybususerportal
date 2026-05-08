@@ -11,7 +11,12 @@ function fmt(t) {
 
 function timeAgo(ts) {
   if (!ts) return '';
-  const mins = Math.round((Date.now() - new Date(ts)) / 60000);
+  // Backend stores UTC timestamps without 'Z' suffix — JS would treat as local time
+  let utcTs = ts;
+  if (typeof ts === 'string' && !ts.endsWith('Z') && !ts.includes('+')) {
+    utcTs = ts.replace(' ', 'T') + 'Z';
+  }
+  const mins = Math.round((Date.now() - new Date(utcTs)) / 60000);
   if (mins <= 1) return 'Updated just now';
   if (mins < 60) return `Updated ${mins}m ago`;
   return `Updated ${Math.round(mins / 60)}h ago`;
