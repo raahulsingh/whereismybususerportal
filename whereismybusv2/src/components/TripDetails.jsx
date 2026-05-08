@@ -22,12 +22,15 @@ function timeAgo(ts) {
   return `Updated ${Math.round(mins / 60)}h ago`;
 }
 
-// Returns delay info for a stop based on its scheduled arrival vs NOW
-function getDelayInfo(arrivalTime) {
+// Returns delay info for a stop based on its scheduled arrival vs a reference time
+// referenceTime: use lastPingAt for current/passed stops, Date.now() for future stops
+function getDelayInfo(arrivalTime, referenceTime) {
   if (!arrivalTime) return null;
   const scheduled = new Date(arrivalTime);
   if (isNaN(scheduled)) return null;
-  const diffMin = Math.floor((Date.now() - scheduled) / 60000);
+  const ref = referenceTime ? new Date(referenceTime) : new Date();
+  if (isNaN(ref)) return null;
+  const diffMin = Math.floor((ref - scheduled) / 60000);
   if (diffMin > 0) return { type: 'late', min: diffMin };
   if (diffMin < 0) return { type: 'early', min: Math.abs(diffMin) };
   return { type: 'ontime', min: 0 };
@@ -309,10 +312,38 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
           }
 
           if (isActiveDay && !isPassed) {
-            const delayInfo = getDelayInfo(s.departureTime || s.arrivalTime);
+            const isLastStop = i === stops.length - 1;
+            const busAtOrPastThisStop = currentSeq != null && s.seq <= currentSeq;
 
-            if (busState) {
-              // ✅ Bus location confirmed (live active trip) — show actual delay
+            // If bus has reached the LAST stop (destination) — show "Arrived", no delay
+            if (isLastStop && busAtOrPastThisStop && busState) {
+              badge = (
+                <div style={{
+                  marginTop: 3, display: 'inline-block',
+                  background: '#f0fdf4', color: '#166534',
+                  border: '1px solid #86efac', borderRadius: 6,
+                  padding: '2px 8px', fontSize: 11, fontWeight: 600,
+                }}>
+                  ✅ Arrived
+                </div>
+              );
+            } else if (busState) {
+              // For current stop or future stops with live bus state:
+              // Use lastPingAt as reference for the CURRENT stop (freeze delay)
+              // Use Date.now() for future stops
+              let refTime;
+              if (isCurrent && busState?.lastPingAt) {
+                // Freeze delay at the time of last GPS ping for the current stop
+                let pingTs = busState.lastPingAt;
+                if (typeof pingTs === 'string' && !pingTs.endsWith('Z') && !pingTs.includes('+')) {
+                  pingTs = pingTs.replace(' ', 'T') + 'Z';
+                }
+                refTime = pingTs;
+              } else {
+                refTime = undefined; // uses Date.now() for future stops
+              }
+              const delayInfo = getDelayInfo(s.departureTime || s.arrivalTime, refTime);
+
               if (delayInfo?.type === 'late') {
                 badge = (
                   <div style={{
@@ -337,7 +368,7 @@ export default function TripDetails({ details: initialDetails, travelDate }) {
                 );
               }
             } else if (i === firstUnpassedIdx || firstUnpassedIdx === -1) {
-              // ✅ No live bus state for this trip — show "Waiting for update" ONLY on the first un-passed stop
+              const delayInfo = getDelayInfo(s.departureTime || s.arrivalTime);
               if (delayInfo?.type === 'late') {
                 badge = (
                   <div style={{
