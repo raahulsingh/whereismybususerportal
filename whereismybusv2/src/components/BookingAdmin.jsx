@@ -257,7 +257,7 @@ export default function BookingAdmin() {
                         </td>
                         <td style={{ ...tdStyle, fontSize: 11, color: '#94a3b8' }}>
                           {b.booked_at
-                            ? new Date(b.booked_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                            ? new Date(b.booked_at.toString().endsWith('Z') || b.booked_at.includes('+') ? b.booked_at : b.booked_at + 'Z').toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
                             : '—'}
                         </td>
                         <td style={{ ...tdStyle, fontWeight: 700, color: '#16a34a' }}>
