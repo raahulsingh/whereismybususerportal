@@ -65,7 +65,10 @@ export default function BookingPage({ user, onRequestLogin }) {
       for (const p of paymentPassengers) {
         const res = await fetch(getApiUrl('/api/booking/book'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('bus_token')}`
+          },
           body: JSON.stringify({
             tripId: selectedTrip.tripId,
             seatNo: p.seatNo,

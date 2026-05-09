@@ -6,7 +6,7 @@ function fmt(t) {
   if (!t) return '—';
   const d = new Date(t);
   if (isNaN(d)) return t;
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 function timeAgo(ts) {

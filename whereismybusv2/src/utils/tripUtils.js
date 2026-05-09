@@ -6,9 +6,16 @@
  */
 export function calculateDuration(start, end) {
   if (!start || !end) return null;
-  const s = new Date(start), e = new Date(end);
+  const s = new Date(start);
+  let e = new Date(end);
   if (isNaN(s) || isNaN(e)) return null;
-  const mins = Math.floor(Math.abs(e - s) / 60000);
+
+  // If destination time is earlier than start time, it's an overnight trip
+  if (e < s) {
+    e.setDate(e.getDate() + 1);
+  }
+
+  const mins = Math.floor((e - s) / 60000);
   const h = Math.floor(mins / 60), m = mins % 60;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }

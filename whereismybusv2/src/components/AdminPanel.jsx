@@ -86,7 +86,7 @@ function StopTimesModal({ tripId, tripInfo, onClose }) {
   const fmt = dt => {
     if (!dt) return "—";
     const d = new Date(dt);
-    return isNaN(d) ? dt : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return isNaN(d) ? dt : d.toLocaleTimeString('en-IN', { hour: "2-digit", minute: "2-digit", hour12: true });
   };
 
   return (
@@ -374,7 +374,7 @@ export default function AdminPanel() {
     if (!dt) return "—";
     const d = new Date(dt);
     return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-      + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      + " " + d.toLocaleTimeString('en-IN', { hour: "2-digit", minute: "2-digit", hour12: true });
   };
 
   // Today's date string for highlighting

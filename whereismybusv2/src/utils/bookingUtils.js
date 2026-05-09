@@ -1,7 +1,7 @@
 export function fmt(t) {
   if (!t) return '—';
   const d = new Date(t);
-  return isNaN(d) ? t : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return isNaN(d) ? t : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 export function fmtDate(t) {
@@ -12,7 +12,15 @@ export function fmtDate(t) {
 
 export function duration(from, to) {
   if (!from || !to) return '';
-  const m = Math.floor(Math.abs(new Date(to) - new Date(from)) / 60000);
+  const d1 = new Date(from);
+  let d2 = new Date(to);
+  
+  // If destination time is earlier than start time, it's an overnight trip
+  if (d2 < d1) {
+    d2.setDate(d2.getDate() + 1);
+  }
+  
+  const m = Math.floor((d2 - d1) / 60000);
   return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 

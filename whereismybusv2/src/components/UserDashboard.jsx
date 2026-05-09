@@ -97,7 +97,7 @@ export default function UserDashboard() {
           {bookings.map((bk, i) => {
             const dt = new Date(bk.dep_time);
             const dateStr = isNaN(dt) ? bk.travel_date : dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-            const timeStr = isNaN(dt) ? "—" : dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            const timeStr = isNaN(dt) ? "—" : dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
             return (
               <div key={i} className="mobile-col" style={{ display: 'flex', background: '#fff', borderRadius: 16, boxShadow: '0 4px 16px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
                 <div className="mobile-w-100" style={{ width: 140, background: '#2563eb', padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
@@ -167,7 +167,7 @@ export default function UserDashboard() {
                   <div style={{ fontSize: '12pt', fontWeight: 'bold', color: '#1e293b' }}>
                     {isNaN(new Date(downloadingRef.dep_time))
                       ? "—"
-                      : new Date(downloadingRef.dep_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                      : new Date(downloadingRef.dep_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                   </div>
                 </div>
               </div>
